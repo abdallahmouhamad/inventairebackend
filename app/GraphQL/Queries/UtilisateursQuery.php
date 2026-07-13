@@ -3,22 +3,22 @@
 namespace App\GraphQL\Queries;
 
 use App\Models\QueryModel;
-use App\Support\Outils;
+use App\Models\Utilisateur;
 use GraphQL\Type\Definition\Type;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 use Rebing\GraphQL\Support\Facades\GraphQL;
 use Rebing\GraphQL\Support\Query;
 
-class UtilisateurPaginatedQuery extends Query
+class UtilisateursQuery extends Query
 {
     protected $attributes = [
-        'name' => 'utilisateurPaginated',
-        'description' => 'Liste paginee des utilisateurs',
+        'name' => 'utilisateurs',
+        'description' => 'Liste (non paginee) des utilisateurs filtres',
     ];
 
     public function type(): Type
     {
-        return GraphQL::paginate('Utilisateur');
+        return Type::listOf(GraphQL::type('Utilisateur'));
     }
 
     /**
@@ -26,7 +26,7 @@ class UtilisateurPaginatedQuery extends Query
      */
     public function args(): array
     {
-        return Outils::paginationArgs() + [
+        return [
             'recherche' => [
                 'type' => Type::string(),
                 'description' => 'Filtre sur prenom, nom ou email',
@@ -43,14 +43,10 @@ class UtilisateurPaginatedQuery extends Query
 
     /**
      * @param array<string, mixed> $args
+     * @return Collection<int, Utilisateur>
      */
-    public function resolve(mixed $root, array $args): LengthAwarePaginator
+    public function resolve(mixed $root, array $args): Collection
     {
-        return QueryModel::getQueryUtilisateur($args, $root)->paginate(
-            $args['count'] ?? 15,
-            ['*'],
-            'page',
-            $args['page'] ?? 1
-        );
+        return QueryModel::getQueryUtilisateur($args, $root)->get();
     }
 }

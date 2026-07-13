@@ -93,7 +93,8 @@ return [
         'default' => [
             'query' => [
                 'utilisateur' => App\GraphQL\Queries\UtilisateurQuery::class,
-                'utilisateurs' => App\GraphQL\Queries\UtilisateurPaginatedQuery::class,
+                'utilisateurs' => App\GraphQL\Queries\UtilisateursQuery::class,
+                'utilisateurPaginated' => App\GraphQL\Queries\UtilisateurPaginatedQuery::class,
             ],
             'mutation' => [
                 // ExampleMutation::class,
