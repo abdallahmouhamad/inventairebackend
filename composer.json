@@ -67,6 +67,21 @@
         ],
         "pre-package-uninstall": [
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
+        ],
+        "config-server-backinventairex3": [
+            "@php -r \"file_exists('.env') || copy('.env.server', '.env');\"",
+            "composer install --no-dev --optimize-autoloader",
+            "php artisan config:clear",
+            "php artisan cache:clear",
+            "php artisan config:cache",
+            "php artisan route:cache",
+            "php artisan event:cache",
+            "chmod -R 2777 storage bootstrap/cache"
+        ],
+        "update-server-backinventairex3": [
+            "git fetch --all",
+            "git pull --ff-only",
+            "@config-server-backinventairex3"
         ]
     },
     "extra": {
