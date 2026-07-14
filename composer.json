@@ -70,7 +70,7 @@
         ],
         "config-server-backinventairex3": [
             "@php -r \"file_exists('.env') || copy('.env.server', '.env');\"",
-            "composer install --no-dev --optimize-autoloader",
+            "@composer install --no-dev --optimize-autoloader",
             "php artisan config:clear",
             "php artisan cache:clear",
             "php artisan config:cache",
