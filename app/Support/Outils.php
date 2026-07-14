@@ -52,4 +52,24 @@ class Outils
 
         return response()->json($payload, $statut);
     }
+
+    /**
+     * Nettoie une date brute issue de Sage X3 (via RererentielX3) : les dates
+     * "nulles" y sont representees par des sentinelles SQL Server
+     * (1753-01-01, date minimale DATETIME ; 1899-12-31, epoque OLE/Delphi),
+     * jamais par un vrai null JSON. A appeler sur tout champ date_* provenant
+     * de l'API X3 avant de le stocker ou de l'exposer.
+     */
+    public static function nettoyerDateX3(?string $valeur): ?string
+    {
+        if ($valeur === null || trim($valeur) === '') {
+            return null;
+        }
+
+        if (str_starts_with($valeur, '1753-01-01') || str_starts_with($valeur, '1899-12-31')) {
+            return null;
+        }
+
+        return $valeur;
+    }
 }

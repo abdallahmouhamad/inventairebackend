@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    /*
+     * API PHP "RererentielX3" -- interface de lecture seule deja en place
+     * entre Laravel et Sage X3 (voir Docs/FRONTEND_CONTEXT.md §1/§2). Jamais
+     * de tables X3 dupliquees en Postgres, on interroge en direct via HTTP.
+     */
+    'referentielx3' => [
+        'base_url' => env('REFERENTIELX3_BASE_URL', 'http://102.16.235.175:9090/referentielx3'),
+        'timeout' => env('REFERENTIELX3_TIMEOUT', 15),
+    ],
+
 ];

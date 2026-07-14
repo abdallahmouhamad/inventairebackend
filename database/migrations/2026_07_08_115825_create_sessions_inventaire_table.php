@@ -15,7 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('code')->unique();
             $table->string('nom');
-            $table->foreignUuid('site_id')->constrained('sites');
+            $table->string('code_site');
             $table->string('statut');
             $table->date('date_debut');
             $table->date('date_fin')->nullable();

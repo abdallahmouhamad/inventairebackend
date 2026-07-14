@@ -95,6 +95,9 @@ return [
                 'utilisateur' => App\GraphQL\Queries\UtilisateurQuery::class,
                 'utilisateurs' => App\GraphQL\Queries\UtilisateursQuery::class,
                 'utilisateurPaginated' => App\GraphQL\Queries\UtilisateurPaginatedQuery::class,
+                'sessionInventaire' => App\GraphQL\Queries\SessionInventaireQuery::class,
+                'sessionsInventaire' => App\GraphQL\Queries\SessionsInventaireQuery::class,
+                'sessionInventairePaginated' => App\GraphQL\Queries\SessionInventairePaginatedQuery::class,
             ],
             'mutation' => [
                 // ExampleMutation::class,
@@ -107,9 +110,10 @@ return [
             // Laravel HTTP middleware applied to this schema's route.
             // Overrides the global route.middleware when set (non-null).
             //
-            // Example with CSRF protection (recommended for session-authenticated schemas):
-            // 'middleware' => [\Rebing\GraphQL\Support\Middleware\CsrfGuard::class],
-            'middleware' => null,
+            // Toutes les donnees exposees ici (utilisateurs, sessions) sont
+            // sensibles et scopees par site : authentification + reserve au
+            // Web Admin obligatoires, comme les routes REST.
+            'middleware' => ['auth:api', 'role.web'],
 
             // Which HTTP methods to support; must be given in UPPERCASE!
             // GET requests are disabled by default to reduce CSRF attack surface
@@ -146,6 +150,7 @@ return [
     'types' => [
         App\GraphQL\Types\RoleType::class,
         App\GraphQL\Types\UtilisateurType::class,
+        App\GraphQL\Types\SessionInventaireType::class,
     ],
 
     // This callable will be passed the Error object for each errors GraphQL catch.

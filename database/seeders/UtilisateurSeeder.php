@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Role;
-use App\Models\Site;
 use App\Models\Utilisateur;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -11,8 +10,14 @@ use Illuminate\Support\Facades\Hash;
 
 /**
  * Comptes de demonstration (mot de passe unique demo2026, comme documente dans
- * FRONTEND_CONTEXT.md §5) -- domaine @pna.sn retenu suite a l'arbitrage sur
- * l'incoherence README (@pna.sn) vs mock front (@inventaire.com).
+ * FRONTEND_CONTEXT.md §3.1) -- domaine @pna.sn conserve comme donnee de test
+ * fictive (voir §8 FRONTEND_CONTEXT.md : le domaine reel est encore une
+ * clarification ouverte, ni @pna.sn ni @inventaire.com n'est confirme).
+ *
+ * Les codes site sont en revanche les VRAIS codes Sage X3 (recuperes via
+ * GET /sites sur RererentielX3 : MC01, AG01...) pour que le scoping site des
+ * INVENTORY_MANAGER de demo produise de vrais resultats une fois
+ * POST /api/sessions/synchroniser-x3 declenche.
  */
 class UtilisateurSeeder extends Seeder
 {
@@ -20,20 +25,13 @@ class UtilisateurSeeder extends Seeder
 
     public function run(): void
     {
-        $siteMagasinCentral = Site::where('code', 'site-1')->first();
-        $sitePra = Site::where('code', 'site-2')->first();
+        $this->creerUtilisateur('Admin', 'PNA', 'admin@pna.sn', Role::SUPER_ADMIN);
 
-        $superAdmin = $this->creerUtilisateur('Admin', 'PNA', 'admin@pna.sn', Role::SUPER_ADMIN);
+        $invMc01 = $this->creerUtilisateur('Responsable', 'Magasin Central', 'inv.mc01@pna.sn', Role::INVENTORY_MANAGER);
+        $invMc01->attacherSites(['MC01']);
 
-        $invMcd = $this->creerUtilisateur('Responsable', 'Magasin Central', 'inv.mcd@pna.sn', Role::INVENTORY_MANAGER);
-        if ($siteMagasinCentral) {
-            $invMcd->sites()->syncWithoutDetaching([$siteMagasinCentral->id]);
-        }
-
-        $invDkr = $this->creerUtilisateur('Responsable', 'PRA Dakar', 'inv.dkr@pna.sn', Role::INVENTORY_MANAGER);
-        if ($sitePra) {
-            $invDkr->sites()->syncWithoutDetaching([$sitePra->id]);
-        }
+        $invAg01 = $this->creerUtilisateur('Responsable', 'Agence Toamasina', 'inv.ag01@pna.sn', Role::INVENTORY_MANAGER);
+        $invAg01->attacherSites(['AG01']);
 
         $this->creerUtilisateur('Audit', 'Lecture Seule', 'audit@pna.sn', Role::READONLY);
 

@@ -6,9 +6,9 @@ use Database\Factories\UtilisateurFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
 class Utilisateur extends Authenticatable implements JWTSubject
@@ -77,11 +77,31 @@ class Utilisateur extends Authenticatable implements JWTSubject
     }
 
     /**
-     * @return BelongsToMany<Site, $this>
+     * Codes des sites (X3) auxquels cet utilisateur est scope. Le referentiel
+     * site n'est pas persiste localement (cf. RererentielX3) : on stocke donc
+     * uniquement le code_site, pas de relation Eloquent vers un modele Site.
+     *
+     * @return array<int, string>
      */
-    public function sites(): BelongsToMany
+    public function codesSites(): array
     {
-        return $this->belongsToMany(Site::class, 'site_utilisateur');
+        return DB::table('utilisateur_site')
+            ->where('utilisateur_id', $this->id)
+            ->pluck('code_site')
+            ->all();
+    }
+
+    /**
+     * @param array<int, string> $codesSites
+     */
+    public function attacherSites(array $codesSites): void
+    {
+        $lignes = array_map(
+            fn (string $codeSite) => ['utilisateur_id' => $this->id, 'code_site' => $codeSite],
+            $codesSites,
+        );
+
+        DB::table('utilisateur_site')->insertOrIgnore($lignes);
     }
 
     public function getAuthPassword(): string
@@ -106,7 +126,7 @@ class Utilisateur extends Authenticatable implements JWTSubject
     {
         return [
             'role' => $this->role->code,
-            'site_ids' => $this->sites()->pluck('sites.id'),
+            'site_ids' => $this->codesSites(),
         ];
     }
 }

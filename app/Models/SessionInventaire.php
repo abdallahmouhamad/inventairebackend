@@ -32,7 +32,7 @@ class SessionInventaire extends Model
     protected $fillable = [
         'code',
         'nom',
-        'site_id',
+        'code_site',
         'statut',
         'date_debut',
         'date_fin',
@@ -56,27 +56,11 @@ class SessionInventaire extends Model
     }
 
     /**
-     * @return BelongsTo<Site, $this>
-     */
-    public function site(): BelongsTo
-    {
-        return $this->belongsTo(Site::class);
-    }
-
-    /**
      * @return BelongsTo<Utilisateur, $this>
      */
     public function ouvertePar(): BelongsTo
     {
         return $this->belongsTo(Utilisateur::class, 'ouverte_par');
-    }
-
-    /**
-     * @return BelongsToMany<Depot, $this>
-     */
-    public function depots(): BelongsToMany
-    {
-        return $this->belongsToMany(Depot::class, 'session_inventaire_depot');
     }
 
     /**

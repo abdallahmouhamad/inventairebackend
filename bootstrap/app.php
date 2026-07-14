@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureWebRole;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -16,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // API pure, pas de route "login" web : ne jamais tenter de generer une
         // redirection vers elle (sinon RouteNotFoundException au lieu d'un 401 JSON).
         $middleware->redirectGuestsTo(fn () => null);
+
+        $middleware->alias([
+            'role.web' => EnsureWebRole::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // API pure : jamais de redirection vers une route "login" web (qui n'existe
