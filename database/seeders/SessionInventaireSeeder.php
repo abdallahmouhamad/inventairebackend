@@ -43,9 +43,10 @@ class SessionInventaireSeeder extends Seeder
 
     private function creerSessionsDeTest(): void
     {
-        $invMc01 = Utilisateur::where('email', 'inv.mc01@pna.sn')->first();
+        $invMc01 = Utilisateur::where('email', 'inv.mc01@inventaire.sn')->first();
+        $operateur = Utilisateur::where('email', 'operateur1@inventaire.sn')->first();
 
-        SessionInventaire::firstOrCreate(
+        $session1 = SessionInventaire::firstOrCreate(
             ['code' => 'DEV-INV-001'],
             [
                 'nom' => 'Inventaire chambre froide (donnee de dev)',
@@ -59,7 +60,7 @@ class SessionInventaireSeeder extends Seeder
             ],
         );
 
-        SessionInventaire::firstOrCreate(
+        $session2 = SessionInventaire::firstOrCreate(
             ['code' => 'DEV-INV-002'],
             [
                 'nom' => 'Inventaire produits dangereux (donnee de dev)',
@@ -74,5 +75,12 @@ class SessionInventaireSeeder extends Seeder
                 'lignes_validees' => 40,
             ],
         );
+
+        // Agent autorise sur les deux sessions de test, pour pouvoir tester
+        // GET /api/mobile/sessions des le premier seed.
+        if ($operateur) {
+            $session1->utilisateursAutorises()->syncWithoutDetaching([$operateur->id]);
+            $session2->utilisateursAutorises()->syncWithoutDetaching([$operateur->id]);
+        }
     }
 }

@@ -83,6 +83,24 @@ class QueryModel
     }
 
     /**
+     * Sessions visibles par un agent mobile : uniquement celles ou il figure
+     * dans les agents autorises, jamais IMPORTED_FROM_X3 (une session pas
+     * encore ouverte par le responsable ne doit jamais apparaitre cote
+     * mobile -- FRONTEND_CONTEXT.md §3.3).
+     *
+     * @return Builder<SessionInventaire>
+     */
+    public static function getQuerySessionInventaireMobile(Utilisateur $agent): Builder
+    {
+        return SessionInventaire::query()
+            ->whereHas('utilisateursAutorises', function (Builder $q) use ($agent) {
+                $q->where('utilisateurs.id', $agent->id);
+            })
+            ->where('statut', '!=', SessionInventaire::STATUT_IMPORTED_FROM_X3)
+            ->orderByDesc('date_debut');
+    }
+
+    /**
      * Restreint la requete aux sites de l'utilisateur connecte (vide =
      * SUPER_ADMIN/READONLY = tous sites). Meme regle que
      * SessionInventairePolicy, appliquee ici pour couvrir a la fois les

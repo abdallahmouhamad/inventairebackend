@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\QueryModel;
 use App\Models\SessionInventaire;
+use App\Models\Utilisateur;
 use App\Services\X3\ImportateurSessions;
 use App\Services\X3\X3ConnecteurInterface;
 use App\Support\Outils;
@@ -11,6 +12,7 @@ use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Sessions d'inventaire (module metier Web Admin) -- a ne pas confondre avec
@@ -109,6 +111,60 @@ class SessionInventaireController extends Controller
             return Outils::reponseErreur($e, 403);
         } catch (Exception $e) {
             return Outils::reponseErreur($e, 502);
+        }
+    }
+
+    /**
+     * Autoriser un agent mobile sur la session (l'ajoute a
+     * utilisateursAutorises). Seul un compte OPERATOR/MOBILE_MANAGER peut
+     * etre autorise -- un compte web n'a rien a faire dans cette liste.
+     */
+    public function ajouterAgent(Request $request, string $id): JsonResponse
+    {
+        try {
+            $session = SessionInventaire::findOrFail($id);
+
+            $this->authorize('gererAgents', $session);
+
+            $request->validate([
+                'utilisateur_id' => 'required|uuid|exists:utilisateurs,id',
+            ]);
+
+            $agent = Utilisateur::findOrFail($request->utilisateur_id);
+
+            if (!$agent->isMobileRole()) {
+                throw new Exception("Seul un compte mobile (OPERATOR ou MOBILE_MANAGER) peut etre autorise sur une session.");
+            }
+
+            $session->utilisateursAutorises()->syncWithoutDetaching([$agent->id]);
+
+            return response()->json(['data' => $session->fresh('utilisateursAutorises')]);
+        } catch (AuthorizationException $e) {
+            return Outils::reponseErreur($e, 403);
+        } catch (ValidationException $e) {
+            return Outils::reponseErreur($e, 422);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 400);
+        }
+    }
+
+    /**
+     * Retire un agent de la liste des autorises.
+     */
+    public function retirerAgent(string $id, string $utilisateurId): JsonResponse
+    {
+        try {
+            $session = SessionInventaire::findOrFail($id);
+
+            $this->authorize('gererAgents', $session);
+
+            $session->utilisateursAutorises()->detach($utilisateurId);
+
+            return response()->json(['data' => true]);
+        } catch (AuthorizationException $e) {
+            return Outils::reponseErreur($e, 403);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 400);
         }
     }
 

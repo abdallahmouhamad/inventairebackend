@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureMobileRole;
 use App\Http\Middleware\EnsureWebRole;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role.web' => EnsureWebRole::class,
+            'role.mobile' => EnsureMobileRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

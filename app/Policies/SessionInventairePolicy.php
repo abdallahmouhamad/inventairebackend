@@ -43,6 +43,19 @@ class SessionInventairePolicy
         return in_array($acteur->role->code, [Role::SUPER_ADMIN, Role::INVENTORY_MANAGER], true);
     }
 
+    /**
+     * Autoriser/retirer un agent mobile sur la session -- meme garde que
+     * open (le responsable du site gere ses agents).
+     */
+    public function gererAgents(Utilisateur $acteur, SessionInventaire $session): bool
+    {
+        if (!in_array($acteur->role->code, [Role::SUPER_ADMIN, Role::INVENTORY_MANAGER], true)) {
+            return false;
+        }
+
+        return $this->aAccesAuSite($acteur, $session->code_site);
+    }
+
     private function aAccesAuSite(Utilisateur $acteur, string $codeSite): bool
     {
         $codesSites = $acteur->codesSites();

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\SessionInventaireController;
+use App\Http\Controllers\SessionMobileController;
 use App\Http\Controllers\UtilisateurController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,5 +28,14 @@ Route::middleware(['auth:api', 'role.web'])->group(function () {
     Route::get('sessions/{id}', [SessionInventaireController::class, 'show']);
     Route::put('sessions/{id}/open', [SessionInventaireController::class, 'open']);
     Route::get('sessions/{id}/history', [SessionInventaireController::class, 'history']);
+    Route::post('sessions/{id}/agents', [SessionInventaireController::class, 'ajouterAgent']);
+    Route::delete('sessions/{id}/agents/{utilisateurId}', [SessionInventaireController::class, 'retirerAgent']);
 });
 // === Sessions routes end ===
+
+// === Sessions mobile routes start ===
+Route::middleware(['auth:api', 'role.mobile'])->group(function () {
+    Route::get('mobile/sessions', [SessionMobileController::class, 'index']);
+    Route::get('mobile/sessions/{id}', [SessionMobileController::class, 'show']);
+});
+// === Sessions mobile routes end ===
