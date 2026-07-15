@@ -16,4 +16,13 @@ interface X3ConnecteurInterface
      * @return array<int, array<string, mixed>>
      */
     public function recupererSessions(?string $codeSite = null): array;
+
+    /**
+     * Rayons d'un depot (GET /rayons?site=&depot= sur RererentielX3 --
+     * FRONTEND_CONTEXT.md §2.1). Utilise pour determiner la disponibilite des
+     * rayons lors de la declaration d'un perimetre.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function recupererRayons(string $codeSite, string $codeDepot): array;
 }

@@ -101,6 +101,56 @@ class QueryModel
     }
 
     /**
+     * @param array<string, mixed> $args
+     * @param mixed $root
+     * @return Builder<Perimetre>
+     */
+    public static function getQueryPerimetre(array $args, mixed $root = null): Builder
+    {
+        $query = Perimetre::query()->with('agentDeclarant');
+
+        self::scoperSitesViaSession($query);
+
+        if (isset($args['id'])) {
+            return $query->where('id', $args['id']);
+        }
+
+        if (isset($args['session_id'])) {
+            $query->where('session_id', $args['session_id']);
+        }
+
+        if (isset($args['statut'])) {
+            $query->where('statut', $args['statut']);
+        }
+
+        return $query->orderByDesc('declare_le');
+    }
+
+    /**
+     * Meme principe que scoperSites, mais pour les entites qui n'ont pas de
+     * colonne code_site propre (Perimetre) : filtre via la session parente.
+     *
+     * @param Builder<Perimetre> $query
+     */
+    private static function scoperSitesViaSession(Builder $query): void
+    {
+        /** @var Utilisateur|null $acteur */
+        $acteur = Auth::guard('api')->user();
+
+        if (!$acteur) {
+            return;
+        }
+
+        $codesSites = $acteur->codesSites();
+
+        if (!empty($codesSites)) {
+            $query->whereHas('session', function (Builder $q) use ($codesSites) {
+                $q->whereIn('code_site', $codesSites);
+            });
+        }
+    }
+
+    /**
      * Restreint la requete aux sites de l'utilisateur connecte (vide =
      * SUPER_ADMIN/READONLY = tous sites). Meme regle que
      * SessionInventairePolicy, appliquee ici pour couvrir a la fois les

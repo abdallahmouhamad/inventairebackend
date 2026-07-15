@@ -17,6 +17,11 @@ class ReferentielX3Connecteur implements X3ConnecteurInterface
         return $this->appeler('/sessions', array_filter(['site' => $codeSite]));
     }
 
+    public function recupererRayons(string $codeSite, string $codeDepot): array
+    {
+        return $this->appeler('/rayons', ['site' => $codeSite, 'depot' => $codeDepot]);
+    }
+
     /**
      * @param array<string, mixed> $parametres
      * @return array<int, array<string, mixed>>

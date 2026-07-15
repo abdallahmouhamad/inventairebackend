@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\PerimetreController;
+use App\Http\Controllers\PerimetreMobileController;
 use App\Http\Controllers\SessionInventaireController;
 use App\Http\Controllers\SessionMobileController;
 use App\Http\Controllers\UtilisateurController;
@@ -39,3 +41,22 @@ Route::middleware(['auth:api', 'role.mobile'])->group(function () {
     Route::get('mobile/sessions/{id}', [SessionMobileController::class, 'show']);
 });
 // === Sessions mobile routes end ===
+
+// === Perimetres routes start ===
+Route::middleware(['auth:api', 'role.web'])->group(function () {
+    Route::get('perimeters', [PerimetreController::class, 'index']);
+    Route::get('perimeters/{id}', [PerimetreController::class, 'show']);
+    Route::get('sessions/{id}/perimeters', [PerimetreController::class, 'indexParSession']);
+    Route::put('perimeters/{id}/force-release', [PerimetreController::class, 'forceRelease']);
+    Route::put('perimeters/{perimetreId}/attempts/{tentativeId}/resolve', [PerimetreController::class, 'resoudreTentative']);
+});
+// === Perimetres routes end ===
+
+// === Perimetres mobile routes start ===
+Route::middleware(['auth:api', 'role.mobile'])->group(function () {
+    Route::get('sessions/{id}/available-aisles', [PerimetreMobileController::class, 'rayonsDisponibles']);
+    Route::post('perimeters', [PerimetreMobileController::class, 'declarer']);
+    Route::put('perimeters/{id}/release', [PerimetreMobileController::class, 'liberer']);
+    Route::post('perimeters/{id}/access-attempt', [PerimetreMobileController::class, 'enregistrerTentativeAcces']);
+});
+// === Perimetres mobile routes end ===
