@@ -4,6 +4,7 @@ namespace App\Support;
 
 use GraphQL\Type\Definition\Type;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
@@ -38,9 +39,19 @@ class Outils
      * Contrairement a la convention d'origine, errors_debug et errors_line ne
      * sont exposes que lorsque APP_DEBUG=true : ne jamais divulguer le message
      * d'exception brut ni le numero de ligne a un client en production.
+     *
+     * Journalise egalement l'exception (sauf 401/403/422, routiniers et non
+     * actionnables) : comme cette methode absorbe l'exception au lieu de la
+     * laisser remonter au handler global de Laravel, sans ce Log::error() rien
+     * n'apparaissait jamais dans storage/logs/laravel.log -- un vrai bug etait
+     * devenu indiagnostiquable en production sans acces SSH + tinker.
      */
     public static function reponseErreur(Throwable $e, int $statut = 422): JsonResponse
     {
+        if (!in_array($statut, [401, 403, 422], true)) {
+            Log::error("[{$statut}] {$e->getMessage()}", ['exception' => $e]);
+        }
+
         $payload = [
             'errors' => [config('app.debug') ? $e->getMessage() : 'Une erreur est survenue.'],
         ];
