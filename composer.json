@@ -72,7 +72,6 @@
             "@php -r \"file_exists('.env') || copy('.env.server', '.env');\"",
             "@composer install --no-dev --optimize-autoloader",
             "@php artisan config:clear",
-            "@php artisan cache:clear",
             "@php artisan config:cache",
             "@php artisan route:cache",
             "@php artisan event:cache",
