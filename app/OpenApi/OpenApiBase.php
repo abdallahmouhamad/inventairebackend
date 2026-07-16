@@ -17,8 +17,13 @@ use OpenApi\Attributes as OA;
         . "et Mobile (roles OPERATOR / MOBILE_MANAGER) -- un token obtenu avec un role d'une famille "
         . "est rejete en 403 sur les routes de l'autre famille.",
 )]
+// L5_SWAGGER_CONST_HOST vient de config('l5-swagger...constants'), lui-meme lu depuis
+// la variable d'env du meme nom -- jamais une URL en dur ici : un domaine fige dans le
+// code a deja fait pointer "Try it out" vers le mauvais serveur lors d'un changement de
+// domaine en production (le Swagger UI envoyait les requetes vers l'ancien serveur sans
+// que personne ne s'en rende compte au premier abord).
 #[OA\Server(
-    url: 'https://inventairebackend.erpsmartshop.com',
+    url: L5_SWAGGER_CONST_HOST,
     description: 'Production',
 )]
 #[OA\SecurityScheme(
