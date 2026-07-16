@@ -3,6 +3,7 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\PerimetreController;
 use App\Http\Controllers\PerimetreMobileController;
+use App\Http\Controllers\ReferentielController;
 use App\Http\Controllers\SessionInventaireController;
 use App\Http\Controllers\SessionMobileController;
 use App\Http\Controllers\UtilisateurController;
@@ -60,3 +61,11 @@ Route::middleware(['auth:api', 'role.mobile'])->group(function () {
     Route::post('perimeters/{id}/access-attempt', [PerimetreMobileController::class, 'enregistrerTentativeAcces']);
 });
 // === Perimetres mobile routes end ===
+
+// === Referentiel routes start ===
+// Lecture seule, non sensible : accessible aux deux familles de roles (web ET mobile).
+Route::middleware(['auth:api'])->group(function () {
+    Route::get('reference/sites', [ReferentielController::class, 'sites']);
+    Route::get('reference/depots', [ReferentielController::class, 'depots']);
+});
+// === Referentiel routes end ===
