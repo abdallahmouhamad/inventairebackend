@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "darkaonline/l5-swagger": "^11.1",
         "laravel/framework": "^12.0",
         "laravel/tinker": "^2.10.1",
         "rebing/graphql-laravel": "^10.0",
@@ -75,6 +76,7 @@
             "@php artisan config:cache",
             "@php artisan route:cache",
             "@php artisan event:cache",
+            "@php artisan l5-swagger:generate",
             "chmod -R 2777 storage bootstrap/cache || true"
         ],
         "update-server-backinventairex3": [

@@ -13,11 +13,13 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use OpenApi\Attributes as OA;
 
 /**
  * Declaration/liberation de perimetre cote agent mobile (doc fonctionnel
  * §3.2/§6.3). Routes protegees par le middleware role.mobile.
  */
+#[OA\Tag(name: 'Perimetres (mobile)', description: 'Declaration/liberation de zone de comptage')]
 class PerimetreMobileController extends Controller
 {
     /**
@@ -25,6 +27,30 @@ class PerimetreMobileController extends Controller
      * "L'agent voit les rayons disponibles et les rayons deja occupes par un
      * autre agent, avec son nom").
      */
+    #[OA\Get(
+        path: '/api/sessions/{id}/available-aisles',
+        summary: 'Rayons d\'un depot avec leur disponibilite en temps reel',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres (mobile)'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'ID de la session', schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'depot', in: 'query', required: true, description: 'Code depot X3', schema: new OA\Schema(type: 'string', example: 'MC01')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Liste des rayons du depot.',
+                content: new OA\JsonContent(example: [
+                    'data' => [
+                        ['code_site' => 'MC01', 'code_depot' => 'MC01', 'code_rayon' => '01A', 'nb_emplacements' => '30', 'disponible' => true, 'occupe_par' => null, 'perimetre_id' => null],
+                        ['code_site' => 'MC01', 'code_depot' => 'MC01', 'code_rayon' => '01B', 'nb_emplacements' => '30', 'disponible' => false, 'occupe_par' => 'Ibrahima Fall', 'perimetre_id' => '019f...'],
+                    ],
+                ]),
+            ),
+            new OA\Response(response: 404, description: 'Session introuvable ou agent non autorise sur cette session.'),
+            new OA\Response(response: 422, description: 'Parametre depot manquant.'),
+        ],
+    )]
     public function rayonsDisponibles(Request $request, X3ConnecteurInterface $connecteur, string $id): JsonResponse
     {
         try {
@@ -80,6 +106,40 @@ class PerimetreMobileController extends Controller
      * meme rayon en concurrence. En cas de conflit, une tentative d'acces
      * refusee est enregistree automatiquement pour chaque rayon en cause.
      */
+    #[OA\Post(
+        path: '/api/perimeters',
+        summary: 'Declarer un perimetre (depot + rayons)',
+        description: 'Verification atomique de disponibilite. En cas de conflit (409), une tentative d\'acces refusee est enregistree automatiquement.',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres (mobile)'],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['session_id', 'code_depot', 'codes_rayons'],
+                properties: [
+                    new OA\Property(property: 'session_id', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'code_depot', type: 'string', example: 'MC01'),
+                    new OA\Property(property: 'codes_rayons', type: 'array', items: new OA\Items(type: 'string'), example: ['01A', '01B']),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(
+                response: 201,
+                description: 'Perimetre declare.',
+                content: new OA\JsonContent(example: [
+                    'data' => ['id' => '019f...', 'session_id' => '019f...', 'code_depot' => 'MC01', 'statut' => 'DECLARED', 'declare_le' => '2026-07-15T16:13:08.000000Z', 'codes_rayons' => ['01A', '01B']],
+                ]),
+            ),
+            new OA\Response(response: 400, description: 'La session n\'est pas dans un statut permettant de declarer.'),
+            new OA\Response(
+                response: 409,
+                description: 'Un ou plusieurs rayons demandes sont deja occupes par un autre agent.',
+                content: new OA\JsonContent(example: ['errors' => ['Rayon(s) deja occupe(s) par un autre agent : 01B.']]),
+            ),
+            new OA\Response(response: 404, description: 'Session introuvable ou agent non autorise.'),
+        ],
+    )]
     public function declarer(Request $request): JsonResponse
     {
         $request->validate([
@@ -183,6 +243,18 @@ class PerimetreMobileController extends Controller
      * Liberation volontaire par l'agent proprietaire, avant soumission de sa
      * fiche (doc fonctionnel §3.2).
      */
+    #[OA\Put(
+        path: '/api/perimeters/{id}/release',
+        summary: 'Liberation volontaire, avant soumission de la fiche',
+        description: 'Seul l\'agent qui a declare le perimetre peut le liberer.',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres (mobile)'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Perimetre libere (statut RELEASED_BY_AGENT).'),
+            new OA\Response(response: 400, description: 'Pas le proprietaire, ou perimetre pas dans un statut actif.'),
+        ],
+    )]
     public function liberer(Request $request, string $id): JsonResponse
     {
         try {
@@ -212,6 +284,23 @@ class PerimetreMobileController extends Controller
      * perimetre deja connu (en plus de l'enregistrement automatique fait par
      * declarer() en cas de conflit direct -- doc fonctionnel §6.3).
      */
+    #[OA\Post(
+        path: '/api/perimeters/{id}/access-attempt',
+        summary: 'Enregistrement manuel d\'une tentative d\'acces refusee',
+        description: 'Complement du 409 automatique de POST /api/perimeters. {id} = le perimetre qui occupe deja le rayon.',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres (mobile)'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, description: 'ID du perimetre en conflit', schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(required: ['code_rayon'], properties: [new OA\Property(property: 'code_rayon', type: 'string', example: '01B')]),
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Tentative enregistree.'),
+            new OA\Response(response: 404, description: 'Perimetre introuvable.'),
+            new OA\Response(response: 422, description: 'code_rayon manquant.'),
+        ],
+    )]
     public function enregistrerTentativeAcces(Request $request, string $id): JsonResponse
     {
         try {

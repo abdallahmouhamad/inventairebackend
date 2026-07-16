@@ -12,6 +12,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use OpenApi\Attributes as OA;
 
 /**
  * Supervision Web Admin des perimetres declares par les agents mobiles (doc
@@ -19,8 +20,22 @@ use Illuminate\Validation\ValidationException;
  * (PerimetreMobileController) -- ce controleur couvre la lecture et les
  * actions reservees au responsable (force-release, resolution d'alerte).
  */
+#[OA\Tag(name: 'Perimetres', description: 'Supervision Web Admin des zones declarees par les agents')]
 class PerimetreController extends Controller
 {
+    #[OA\Get(
+        path: '/api/perimeters',
+        summary: 'Liste des perimetres, paginee et filtrable',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres'],
+        parameters: [
+            new OA\Parameter(name: 'session_id', in: 'query', schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'statut', in: 'query', schema: new OA\Schema(type: 'string', example: 'DECLARED')),
+            new OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
+            new OA\Parameter(name: 'count', in: 'query', schema: new OA\Schema(type: 'integer', default: 15)),
+        ],
+        responses: [new OA\Response(response: 200, description: 'Liste paginee.')],
+    )]
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', Perimetre::class);
@@ -31,6 +46,32 @@ class PerimetreController extends Controller
         return response()->json(['data' => $perimetres]);
     }
 
+    #[OA\Get(
+        path: '/api/perimeters/{id}',
+        summary: 'Detail complet d\'un perimetre (rayons couverts + tentatives d\'acces)',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Detail du perimetre.',
+                content: new OA\JsonContent(example: [
+                    'data' => [
+                        'id' => '019f...',
+                        'session_id' => '019f...',
+                        'code_depot' => 'MC01',
+                        'statut' => 'DECLARED',
+                        'declare_le' => '2026-07-15T16:13:08.000000Z',
+                        'codes_rayons' => ['01A', '01B'],
+                        'tentatives_acces' => [],
+                    ],
+                ]),
+            ),
+            new OA\Response(response: 403, description: 'Site hors du perimetre de l\'acteur.'),
+            new OA\Response(response: 404, description: 'Perimetre introuvable.'),
+        ],
+    )]
     public function show(string $id): JsonResponse
     {
         try {
@@ -51,6 +92,18 @@ class PerimetreController extends Controller
         }
     }
 
+    #[OA\Get(
+        path: '/api/sessions/{id}/perimeters',
+        summary: 'Tous les perimetres d\'une session donnee (non pagine)',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Liste des perimetres.'),
+            new OA\Response(response: 403, description: 'Site hors du perimetre de l\'acteur.'),
+            new OA\Response(response: 404, description: 'Session introuvable.'),
+        ],
+    )]
     public function indexParSession(Request $request, string $id): JsonResponse
     {
         try {
@@ -73,6 +126,27 @@ class PerimetreController extends Controller
      * fonctionnel §6.3). Libere le perimetre quel que soit son statut actif
      * -- utile si un agent a quitte le terrain sans liberer volontairement.
      */
+    #[OA\Put(
+        path: '/api/perimeters/{id}/force-release',
+        summary: 'Liberation forcee d\'un perimetre actif (motif obligatoire)',
+        description: 'Reserve SUPER_ADMIN/INVENTORY_MANAGER (memes site). Utile quand un agent est injoignable et bloque un rayon.',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['motif'],
+                properties: [new OA\Property(property: 'motif', type: 'string', example: 'Agent injoignable, fin de journee')],
+            ),
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Perimetre libere (statut FORCE_RELEASED).'),
+            new OA\Response(response: 403, description: 'Reserve SUPER_ADMIN/INVENTORY_MANAGER, ou site hors perimetre (READONLY toujours refuse).'),
+            new OA\Response(response: 422, description: 'motif manquant ou vide.'),
+            new OA\Response(response: 400, description: 'Le perimetre n\'est pas dans un statut actif.'),
+        ],
+    )]
     public function forceRelease(Request $request, string $id): JsonResponse
     {
         try {
@@ -108,6 +182,21 @@ class PerimetreController extends Controller
     /**
      * Marque une tentative d'acces refusee comme traitee.
      */
+    #[OA\Put(
+        path: '/api/perimeters/{perimetreId}/attempts/{tentativeId}/resolve',
+        summary: 'Marque une tentative d\'acces refusee comme traitee',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres'],
+        parameters: [
+            new OA\Parameter(name: 'perimetreId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'tentativeId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Tentative marquee resolue.'),
+            new OA\Response(response: 403, description: 'Reserve SUPER_ADMIN/INVENTORY_MANAGER.'),
+            new OA\Response(response: 404, description: 'Perimetre ou tentative introuvable.'),
+        ],
+    )]
     public function resoudreTentative(Request $request, string $perimetreId, string $tentativeId): JsonResponse
     {
         try {

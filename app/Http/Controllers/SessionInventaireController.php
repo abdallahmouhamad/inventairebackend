@@ -13,6 +13,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use OpenApi\Attributes as OA;
 
 /**
  * Sessions d'inventaire (module metier Web Admin) -- a ne pas confondre avec
@@ -20,8 +21,24 @@ use Illuminate\Validation\ValidationException;
  * (FRONTEND_CONTEXT.md §2.4 : ce sont deux entites distinctes). Celle-ci vit
  * en Postgres, machine a etats propre (IMPORTED_FROM_X3 -> OPEN -> ...).
  */
+#[OA\Tag(name: 'Sessions', description: 'Sessions d\'inventaire -- Web Admin')]
 class SessionInventaireController extends Controller
 {
+    #[OA\Get(
+        path: '/api/sessions',
+        summary: 'Liste des sessions, paginee et filtrable',
+        description: "Un INVENTORY_MANAGER ne voit que les sessions de ses sites (filtrage automatique cote serveur).",
+        security: [['bearerAuth' => []]],
+        tags: ['Sessions'],
+        parameters: [
+            new OA\Parameter(name: 'recherche', in: 'query', description: 'Recherche sur le code ou le nom', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'code_site', in: 'query', schema: new OA\Schema(type: 'string', example: 'MC01')),
+            new OA\Parameter(name: 'statut', in: 'query', schema: new OA\Schema(type: 'string', example: 'OPEN')),
+            new OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
+            new OA\Parameter(name: 'count', in: 'query', schema: new OA\Schema(type: 'integer', default: 15)),
+        ],
+        responses: [new OA\Response(response: 200, description: 'Liste paginee.')],
+    )]
     public function index(Request $request): JsonResponse
     {
         $this->authorize('viewAny', SessionInventaire::class);
@@ -32,6 +49,18 @@ class SessionInventaireController extends Controller
         return response()->json(['data' => $sessions]);
     }
 
+    #[OA\Get(
+        path: '/api/sessions/{id}',
+        summary: 'Detail complet d\'une session, avec compteurs de progression',
+        security: [['bearerAuth' => []]],
+        tags: ['Sessions'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Detail de la session.'),
+            new OA\Response(response: 403, description: 'Site hors du perimetre de l\'acteur.'),
+            new OA\Response(response: 404, description: 'Session introuvable.'),
+        ],
+    )]
     public function show(string $id): JsonResponse
     {
         try {
@@ -51,6 +80,18 @@ class SessionInventaireController extends Controller
      * IMPORTED_FROM_X3 -> OPEN. Seule transition pilotee par le Web Admin
      * (les suivantes sont pilotees par l'app mobile ou le module Sync).
      */
+    #[OA\Put(
+        path: '/api/sessions/{id}/open',
+        summary: 'Ouvrir la session aux agents mobiles (IMPORTED_FROM_X3 -> OPEN)',
+        security: [['bearerAuth' => []]],
+        tags: ['Sessions'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Session ouverte.'),
+            new OA\Response(response: 400, description: 'La session n\'est pas dans le statut IMPORTED_FROM_X3.'),
+            new OA\Response(response: 403, description: 'Reserve SUPER_ADMIN/INVENTORY_MANAGER, site hors perimetre.'),
+        ],
+    )]
     public function open(string $id): JsonResponse
     {
         try {
@@ -84,6 +125,22 @@ class SessionInventaireController extends Controller
      * traitement local"). Idempotent : rejouable sans creer de doublons
      * (match sur x3_session_id).
      */
+    #[OA\Post(
+        path: '/api/sessions/synchroniser-x3',
+        summary: 'Declenche un import (PULL) manuel des sessions depuis Sage X3',
+        description: 'Scope aux sites de l\'acteur ; n\'ecrase jamais une session deja presente localement.',
+        security: [['bearerAuth' => []]],
+        tags: ['Sessions'],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Import termine.',
+                content: new OA\JsonContent(example: ['data' => ['total_x3' => 5, 'creees' => 2, 'deja_presentes' => 3]]),
+            ),
+            new OA\Response(response: 403, description: 'Reserve SUPER_ADMIN/INVENTORY_MANAGER.'),
+            new OA\Response(response: 502, description: 'RererentielX3 injoignable ou en erreur.'),
+        ],
+    )]
     public function synchroniserX3(Request $request, X3ConnecteurInterface $connecteur, ImportateurSessions $importateur): JsonResponse
     {
         try {
@@ -119,6 +176,25 @@ class SessionInventaireController extends Controller
      * utilisateursAutorises). Seul un compte OPERATOR/MOBILE_MANAGER peut
      * etre autorise -- un compte web n'a rien a faire dans cette liste.
      */
+    #[OA\Post(
+        path: '/api/sessions/{id}/agents',
+        summary: 'Autoriser un agent mobile sur la session',
+        security: [['bearerAuth' => []]],
+        tags: ['Sessions'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['utilisateur_id'],
+                properties: [new OA\Property(property: 'utilisateur_id', type: 'string', format: 'uuid', description: 'Doit etre un compte OPERATOR ou MOBILE_MANAGER')],
+            ),
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Agent autorise.'),
+            new OA\Response(response: 400, description: 'Le compte cible n\'est pas un role mobile.'),
+            new OA\Response(response: 403, description: 'Reserve SUPER_ADMIN/INVENTORY_MANAGER.'),
+        ],
+    )]
     public function ajouterAgent(Request $request, string $id): JsonResponse
     {
         try {
@@ -151,6 +227,20 @@ class SessionInventaireController extends Controller
     /**
      * Retire un agent de la liste des autorises.
      */
+    #[OA\Delete(
+        path: '/api/sessions/{id}/agents/{utilisateurId}',
+        summary: 'Retirer un agent de la liste des autorises',
+        security: [['bearerAuth' => []]],
+        tags: ['Sessions'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'utilisateurId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+        ],
+        responses: [
+            new OA\Response(response: 200, description: 'Agent retire.', content: new OA\JsonContent(example: ['data' => true])),
+            new OA\Response(response: 403, description: 'Reserve SUPER_ADMIN/INVENTORY_MANAGER.'),
+        ],
+    )]
     public function retirerAgent(string $id, string $utilisateurId): JsonResponse
     {
         try {
@@ -174,6 +264,15 @@ class SessionInventaireController extends Controller
      * "toute mutation doit ecrire une entree d'audit") n'est pas encore
      * construit -- prochaine etape logique, a ne pas laisser trainer.
      */
+    #[OA\Get(
+        path: '/api/sessions/{id}/history',
+        summary: 'Historique d\'audit de la session (pas encore implemente)',
+        description: 'Renvoie actuellement toujours data: [] avec une note explicative.',
+        security: [['bearerAuth' => []]],
+        tags: ['Sessions'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        responses: [new OA\Response(response: 200, description: 'Stub, liste vide.', content: new OA\JsonContent(example: ['data' => [], 'note' => "Journal d'audit pas encore implemente cote backend."]))],
+    )]
     public function history(string $id): JsonResponse
     {
         try {
