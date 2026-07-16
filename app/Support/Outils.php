@@ -36,9 +36,15 @@ class Outils
      * Reponse d'erreur JSON uniforme pour les controleurs REST (memes cles que
      * les autres backends de l'entreprise : errors / errors_debug / errors_line).
      *
-     * Contrairement a la convention d'origine, errors_debug et errors_line ne
-     * sont exposes que lorsque APP_DEBUG=true : ne jamais divulguer le message
-     * d'exception brut ni le numero de ligne a un client en production.
+     * Le message de $e est toujours renvoye tel quel dans errors[0], meme en
+     * production : les exceptions passees ici sont soit une ValidationException
+     * (message deja securise, genere par Laravel), soit une Exception ecrite a
+     * la main avec un message volontairement destine a l'utilisateur
+     * ("Identifiants invalides.", etc.) -- masquer ce message rendait l'API
+     * inutilisable cote client, qui ne pouvait distinguer aucun cas d'erreur.
+     * errors_debug/errors_line restent reserves a APP_DEBUG=true : ils
+     * ajoutent la ligne d'origine, un detail d'implementation a ne jamais
+     * exposer en production.
      *
      * Journalise egalement l'exception (sauf 401/403/422, routiniers et non
      * actionnables) : comme cette methode absorbe l'exception au lieu de la
@@ -53,7 +59,7 @@ class Outils
         }
 
         $payload = [
-            'errors' => [config('app.debug') ? $e->getMessage() : 'Une erreur est survenue.'],
+            'errors' => [$e->getMessage()],
         ];
 
         if (config('app.debug')) {
