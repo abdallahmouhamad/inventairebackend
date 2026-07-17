@@ -7,6 +7,8 @@ use App\Http\Controllers\ReferentielController;
 use App\Http\Controllers\SessionInventaireController;
 use App\Http\Controllers\SessionMobileController;
 use App\Http\Controllers\UtilisateurController;
+use App\Http\Controllers\VerrouEmplacementController;
+use App\Http\Controllers\VerrouEmplacementMobileController;
 use Illuminate\Support\Facades\Route;
 
 // === Auth routes start ===
@@ -70,3 +72,18 @@ Route::middleware(['auth:api'])->group(function () {
     Route::get('reference/depots', [ReferentielController::class, 'depots']);
 });
 // === Referentiel routes end ===
+
+// === Verrous routes start ===
+Route::middleware(['auth:api', 'role.web'])->group(function () {
+    Route::get('sessions/{id}/locks', [VerrouEmplacementController::class, 'indexParSession']);
+    Route::put('locks/{id}/force-release', [VerrouEmplacementController::class, 'forceRelease']);
+});
+// === Verrous routes end ===
+
+// === Verrous mobile routes start ===
+Route::middleware(['auth:api', 'role.mobile'])->group(function () {
+    Route::post('locks', [VerrouEmplacementMobileController::class, 'creer']);
+    Route::put('locks/{id}/activity', [VerrouEmplacementMobileController::class, 'activite']);
+    Route::delete('locks/{id}', [VerrouEmplacementMobileController::class, 'liberer']);
+});
+// === Verrous mobile routes end ===

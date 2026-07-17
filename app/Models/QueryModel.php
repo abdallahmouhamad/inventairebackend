@@ -151,10 +151,36 @@ class QueryModel
     }
 
     /**
-     * Meme principe que scoperSites, mais pour les entites qui n'ont pas de
-     * colonne code_site propre (Perimetre) : filtre via la session parente.
+     * Verrous actifs d'une session (doc fonctionnel §6.5 : "Verrous actifs
+     * d'une session"). Filtrable par statut si besoin (rarement utilise, la
+     * plupart des consultations veulent les verrous actifs uniquement).
      *
-     * @param Builder<Perimetre> $query
+     * @param array<string, mixed> $args
+     * @return Builder<VerrouEmplacement>
+     */
+    public static function getQueryVerrouEmplacement(array $args): Builder
+    {
+        $query = VerrouEmplacement::query()->with('agent');
+
+        self::scoperSitesViaSession($query);
+
+        if (isset($args['session_id'])) {
+            $query->where('session_id', $args['session_id']);
+        }
+
+        if (!empty($args['actifs_seulement'])) {
+            $query->whereNull('libere_le');
+        }
+
+        return $query->orderByDesc('verrouille_le');
+    }
+
+    /**
+     * Meme principe que scoperSites, mais pour les entites qui n'ont pas de
+     * colonne code_site propre (Perimetre, VerrouEmplacement) : filtre via
+     * la session parente.
+     *
+     * @param Builder<Perimetre>|Builder<VerrouEmplacement> $query
      */
     private static function scoperSitesViaSession(Builder $query): void
     {
