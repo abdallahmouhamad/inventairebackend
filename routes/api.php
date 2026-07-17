@@ -55,6 +55,7 @@ Route::middleware(['auth:api', 'role.web'])->group(function () {
 
 // === Perimetres mobile routes start ===
 Route::middleware(['auth:api', 'role.mobile'])->group(function () {
+    Route::get('mobile/perimeters', [PerimetreMobileController::class, 'mesPerimetres']);
     Route::get('sessions/{id}/available-aisles', [PerimetreMobileController::class, 'rayonsDisponibles']);
     Route::post('perimeters', [PerimetreMobileController::class, 'declarer']);
     Route::put('perimeters/{id}/release', [PerimetreMobileController::class, 'liberer']);

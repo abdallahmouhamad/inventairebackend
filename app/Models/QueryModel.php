@@ -127,6 +127,30 @@ class QueryModel
     }
 
     /**
+     * Perimetres declares par l'agent mobile connecte -- lui permet de
+     * retrouver son/ses perimetre(s) actif(s) sans dependre d'un cache local
+     * cote app (ex: apres reinstallation). Tous statuts confondus, filtrable
+     * par session.
+     *
+     * @param array<string, mixed> $args
+     * @return Builder<Perimetre>
+     */
+    public static function getQueryPerimetreMobile(Utilisateur $agent, array $args = []): Builder
+    {
+        $query = Perimetre::query()->where('agent_declarant_id', $agent->id);
+
+        if (isset($args['session_id'])) {
+            $query->where('session_id', $args['session_id']);
+        }
+
+        if (isset($args['statut'])) {
+            $query->where('statut', $args['statut']);
+        }
+
+        return $query->orderByDesc('declare_le');
+    }
+
+    /**
      * Meme principe que scoperSites, mais pour les entites qui n'ont pas de
      * colonne code_site propre (Perimetre) : filtre via la session parente.
      *

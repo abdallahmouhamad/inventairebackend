@@ -23,6 +23,44 @@ use OpenApi\Attributes as OA;
 class PerimetreMobileController extends Controller
 {
     /**
+     * Perimetres declares par l'agent connecte, tous statuts confondus --
+     * permet a l'app de retrouver son perimetre actif sans dependre d'un
+     * cache local (ex: apres reinstallation de l'app).
+     */
+    #[OA\Get(
+        path: '/api/mobile/perimeters',
+        summary: 'Perimetres declares par l\'agent connecte',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres (mobile)'],
+        parameters: [
+            new OA\Parameter(name: 'session_id', in: 'query', description: 'Filtrer sur une session', schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'statut', in: 'query', description: 'Filtrer sur un statut (ex: DECLARED)', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Liste des perimetres de l\'agent, du plus recent au plus ancien.',
+                content: new OA\JsonContent(example: [
+                    'data' => [
+                        ['id' => '019f...', 'session_id' => '019f...', 'code_depot' => 'MC01', 'statut' => 'DECLARED', 'declare_le' => '2026-07-15T16:13:08.000000Z', 'codes_rayons' => ['01A', '01B']],
+                    ],
+                ]),
+            ),
+        ],
+    )]
+    public function mesPerimetres(Request $request): JsonResponse
+    {
+        $perimetres = QueryModel::getQueryPerimetreMobile($request->user(), $request->all())->get();
+
+        $donnees = $perimetres->map(fn (Perimetre $perimetre) => [
+            ...$perimetre->toArray(),
+            'codes_rayons' => $perimetre->codesRayons(),
+        ]);
+
+        return response()->json(['data' => $donnees]);
+    }
+
+    /**
      * Rayons d'un depot avec leur disponibilite (doc fonctionnel §3.2 :
      * "L'agent voit les rayons disponibles et les rayons deja occupes par un
      * autre agent, avec son nom").
