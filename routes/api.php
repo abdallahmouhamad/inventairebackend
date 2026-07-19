@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\FicheComptageController;
+use App\Http\Controllers\FicheComptageMobileController;
 use App\Http\Controllers\PerimetreController;
 use App\Http\Controllers\PerimetreMobileController;
 use App\Http\Controllers\ReferentielController;
@@ -87,3 +89,23 @@ Route::middleware(['auth:api', 'role.mobile'])->group(function () {
     Route::delete('locks/{id}', [VerrouEmplacementMobileController::class, 'liberer']);
 });
 // === Verrous mobile routes end ===
+
+// === Fiches de comptage routes start ===
+Route::middleware(['auth:api', 'role.web'])->group(function () {
+    Route::get('submissions', [FicheComptageController::class, 'index']);
+    Route::get('submissions/{id}', [FicheComptageController::class, 'show']);
+    Route::get('sessions/{id}/submissions', [FicheComptageController::class, 'indexParSession']);
+    Route::put('submissions/{id}/start-review', [FicheComptageController::class, 'startReview']);
+    Route::put('submissions/{id}/lines/{lineId}/approve', [FicheComptageController::class, 'approveLine']);
+    Route::put('submissions/{id}/lines/{lineId}/reject', [FicheComptageController::class, 'rejectLine']);
+    Route::put('submissions/{id}/lines/{lineId}/reset', [FicheComptageController::class, 'resetLine']);
+    Route::put('submissions/{id}/validate', [FicheComptageController::class, 'validate']);
+    Route::put('submissions/{id}/revision', [FicheComptageController::class, 'revision']);
+});
+// === Fiches de comptage routes end ===
+
+// === Fiches de comptage mobile routes start ===
+Route::middleware(['auth:api', 'role.mobile'])->group(function () {
+    Route::post('submissions', [FicheComptageMobileController::class, 'creer']);
+});
+// === Fiches de comptage mobile routes end ===

@@ -175,12 +175,38 @@ class QueryModel
         return $query->orderByDesc('verrouille_le');
     }
 
+    
+    /**
+     * @param array<string, mixed> $args
+     * @return Builder<FicheComptage>
+     */
+    public static function getQueryFicheComptage(array $args): Builder
+    {
+        $query = FicheComptage::query()->with('agent');
+
+        self::scoperSitesViaSession($query);
+
+        if (isset($args['id'])) {
+            return $query->where('id', $args['id']);
+        }
+
+        if (isset($args['session_id'])) {
+            $query->where('session_id', $args['session_id']);
+        }
+
+        if (isset($args['statut'])) {
+            $query->where('statut', $args['statut']);
+        }
+
+        return $query->orderByDesc('soumise_le');
+    }
+
     /**
      * Meme principe que scoperSites, mais pour les entites qui n'ont pas de
-     * colonne code_site propre (Perimetre, VerrouEmplacement) : filtre via
-     * la session parente.
+     * colonne code_site propre (Perimetre, VerrouEmplacement, FicheComptage) :
+     * filtre via la session parente.
      *
-     * @param Builder<Perimetre>|Builder<VerrouEmplacement> $query
+     * @param Builder<Perimetre>|Builder<VerrouEmplacement>|Builder<FicheComptage> $query
      */
     private static function scoperSitesViaSession(Builder $query): void
     {

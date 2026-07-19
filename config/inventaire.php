@@ -11,4 +11,12 @@ return [
      */
     'timeout_verrou_minutes' => env('TIMEOUT_VERROU_MINUTES', 15),
 
+    /*
+     * Seuils d'ecart (doc fonctionnel §6.7/§9.3), en pourcentage de la
+     * quantite theorique. En dessous du seuil avertissement : normal.
+     * Entre les deux : a surveiller. Au-dessus du seuil critique : critique.
+     */
+    'seuil_ecart_avertissement_pct' => env('SEUIL_ECART_AVERTISSEMENT_PCT', 5),
+    'seuil_ecart_critique_pct' => env('SEUIL_ECART_CRITIQUE_PCT', 15),
+
 ];
