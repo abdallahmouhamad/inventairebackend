@@ -98,6 +98,15 @@ return [
                 'sessionInventaire' => App\GraphQL\Queries\SessionInventaireQuery::class,
                 'sessionsInventaire' => App\GraphQL\Queries\SessionsInventaireQuery::class,
                 'sessionInventairePaginated' => App\GraphQL\Queries\SessionInventairePaginatedQuery::class,
+                'perimetre' => App\GraphQL\Queries\PerimetreQuery::class,
+                'perimetres' => App\GraphQL\Queries\PerimetresQuery::class,
+                'perimetrePaginated' => App\GraphQL\Queries\PerimetrePaginatedQuery::class,
+                'verrouEmplacement' => App\GraphQL\Queries\VerrouEmplacementQuery::class,
+                'verrousEmplacement' => App\GraphQL\Queries\VerrousEmplacementQuery::class,
+                'verrouEmplacementPaginated' => App\GraphQL\Queries\VerrouEmplacementPaginatedQuery::class,
+                'ficheComptage' => App\GraphQL\Queries\FicheComptageQuery::class,
+                'fichesComptage' => App\GraphQL\Queries\FichesComptageQuery::class,
+                'ficheComptagePaginated' => App\GraphQL\Queries\FicheComptagePaginatedQuery::class,
             ],
             'mutation' => [
                 // ExampleMutation::class,
@@ -151,6 +160,11 @@ return [
         App\GraphQL\Types\RoleType::class,
         App\GraphQL\Types\UtilisateurType::class,
         App\GraphQL\Types\SessionInventaireType::class,
+        App\GraphQL\Types\PerimetreType::class,
+        App\GraphQL\Types\TentativeAccesPerimetreType::class,
+        App\GraphQL\Types\VerrouEmplacementType::class,
+        App\GraphQL\Types\FicheComptageType::class,
+        App\GraphQL\Types\LigneComptageType::class,
     ],
 
     // This callable will be passed the Error object for each errors GraphQL catch.

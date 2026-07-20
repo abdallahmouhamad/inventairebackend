@@ -164,6 +164,10 @@ class QueryModel
 
         self::scoperSitesViaSession($query);
 
+        if (isset($args['id'])) {
+            return $query->where('id', $args['id']);
+        }
+
         if (isset($args['session_id'])) {
             $query->where('session_id', $args['session_id']);
         }
@@ -175,7 +179,6 @@ class QueryModel
         return $query->orderByDesc('verrouille_le');
     }
 
-    
     /**
      * @param array<string, mixed> $args
      * @return Builder<FicheComptage>
