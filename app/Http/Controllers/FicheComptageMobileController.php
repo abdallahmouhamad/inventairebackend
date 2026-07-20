@@ -22,9 +22,10 @@ class FicheComptageMobileController extends Controller
 {
     /**
      * Cree la fiche et ses lignes. Fait passer le perimetre de DECLARED a
-     * AWAITING_REVIEW (doc fonctionnel §5.3) -- un seul envoi possible par
-     * perimetre dans ce chemin "normal" (pas de re-soumission apres
-     * REVISION dans cette premiere passe).
+     * AWAITING_REVIEW (doc fonctionnel §5.3) -- un seul envoi initial possible
+     * par perimetre (statut DECLARED requis) ; une fois la fiche renvoyee en
+     * REVISION, la correction passe par resoumettre() ci-dessous, pas par
+     * un nouvel appel a creer().
      */
     #[OA\Post(
         path: '/api/submissions',
@@ -129,6 +130,116 @@ class FicheComptageMobileController extends Controller
             });
 
             return response()->json(['data' => $fiche->fresh('lignes')], 201);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 400);
+        }
+    }
+
+    /**
+     * Ferme la boucle REVISION -> (agent corrige) -> SUBMITTED (doc
+     * fonctionnel §5.4/§3.1) : seules les lignes REJECTED peuvent etre
+     * corrigees ici, les APPROVED restent verrouillees en lecture seule
+     * (non modifiables via cet endpoint, meme si un id est fourni pour
+     * elles). Remet le perimetre a AWAITING_REVIEW, symetrique de la
+     * soumission initiale -- le responsable doit rappeler start-review pour
+     * reexaminer.
+     */
+    #[OA\Put(
+        path: '/api/submissions/{id}/resoumettre',
+        summary: 'Corrige et renvoie une fiche en REVISION',
+        description: 'Seules les lignes REJECTED de la fiche peuvent etre corrigees ici -- les lignes APPROVED restent verrouillees.',
+        security: [['bearerAuth' => []]],
+        tags: ['Fiches de comptage (mobile)'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['lignes'],
+                properties: [
+                    new OA\Property(property: 'lignes', type: 'array', items: new OA\Items(
+                        required: ['id', 'qte_comptee_itu', 'qte_comptee_stu'],
+                        properties: [
+                            new OA\Property(property: 'id', type: 'string', format: 'uuid', description: 'id d\'une ligne REJECTED de cette fiche'),
+                            new OA\Property(property: 'numero_lot', type: 'string', example: 'NL2012503-A'),
+                            new OA\Property(property: 'numero_lot_parent', type: 'string', nullable: true, example: 'NL2012503'),
+                            new OA\Property(property: 'date_peremption', type: 'string', format: 'date', nullable: true),
+                            new OA\Property(property: 'est_correction_lot', type: 'boolean', example: true),
+                            new OA\Property(property: 'qte_comptee_itu', type: 'integer', example: 20),
+                            new OA\Property(property: 'qte_comptee_stu', type: 'integer', example: 0),
+                        ],
+                    )),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(response: 200, description: 'Fiche renvoyee, statut SUBMITTED.'),
+            new OA\Response(response: 403, description: 'Fiche n\'appartenant pas a l\'agent connecte.'),
+            new OA\Response(response: 400, description: 'La fiche n\'est pas au statut REVISION, ou une ligne indiquee n\'est pas REJECTED.'),
+            new OA\Response(response: 422, description: 'Champs manquants ou invalides.'),
+        ],
+    )]
+    public function resoumettre(Request $request, string $id): JsonResponse
+    {
+        $request->validate([
+            'lignes' => 'required|array|min:1',
+            'lignes.*.id' => 'required|uuid',
+            'lignes.*.qte_comptee_itu' => 'required|integer|min:0',
+            'lignes.*.qte_comptee_stu' => 'required|integer|min:0',
+        ]);
+
+        $agent = $request->user();
+
+        try {
+            $fiche = FicheComptage::with('lignes')->findOrFail($id);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 404);
+        }
+
+        if ($fiche->agent_id !== $agent->id) {
+            return Outils::reponseErreur(new Exception("Cette fiche n'appartient pas a l'agent connecte."), 403);
+        }
+
+        if ($fiche->statut !== FicheComptage::STATUT_REVISION) {
+            return Outils::reponseErreur(
+                new Exception("Cette fiche n'est pas au statut REVISION (statut actuel : {$fiche->statut})."),
+                400,
+            );
+        }
+
+        try {
+            DB::transaction(function () use ($fiche, $request) {
+                foreach ($request->input('lignes') as $donneesLigne) {
+                    $ligne = $fiche->lignes->firstWhere('id', $donneesLigne['id']);
+
+                    if (!$ligne) {
+                        throw new Exception("La ligne {$donneesLigne['id']} n'appartient pas a cette fiche.");
+                    }
+
+                    if ($ligne->statut_review !== LigneComptage::REVIEW_REJECTED) {
+                        throw new Exception("La ligne {$ligne->id} n'est pas rejetee (statut actuel : {$ligne->statut_review}), elle ne peut pas etre corrigee.");
+                    }
+
+                    $ligne->update([
+                        'numero_lot' => $donneesLigne['numero_lot'] ?? $ligne->numero_lot,
+                        'numero_lot_parent' => $donneesLigne['numero_lot_parent'] ?? $ligne->numero_lot_parent,
+                        'date_peremption' => $donneesLigne['date_peremption'] ?? $ligne->date_peremption,
+                        'est_correction_lot' => $donneesLigne['est_correction_lot'] ?? $ligne->est_correction_lot,
+                        'qte_comptee_itu' => $donneesLigne['qte_comptee_itu'],
+                        'qte_comptee_stu' => $donneesLigne['qte_comptee_stu'],
+                        'statut_review' => LigneComptage::REVIEW_PENDING,
+                        'commentaire_rejet' => null,
+                    ]);
+                }
+
+                $fiche->update([
+                    'statut' => FicheComptage::STATUT_SUBMITTED,
+                    'soumise_le' => now(),
+                ]);
+
+                $fiche->perimetre->update(['statut' => Perimetre::STATUT_AWAITING_REVIEW]);
+            });
+
+            return response()->json(['data' => $fiche->fresh('lignes')]);
         } catch (Exception $e) {
             return Outils::reponseErreur($e, 400);
         }

@@ -107,5 +107,6 @@ Route::middleware(['auth:api', 'role.web'])->group(function () {
 // === Fiches de comptage mobile routes start ===
 Route::middleware(['auth:api', 'role.mobile'])->group(function () {
     Route::post('submissions', [FicheComptageMobileController::class, 'creer']);
+    Route::put('submissions/{id}/resoumettre', [FicheComptageMobileController::class, 'resoumettre']);
 });
 // === Fiches de comptage mobile routes end ===
