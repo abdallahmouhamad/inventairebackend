@@ -9,11 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Fiche de comptage (Submission, doc fonctionnel §5.1/§5.4/§6.4). Chemin
- * "normal" seulement pour cette premiere passe : SUBMITTED -> IN_REVIEW ->
- * VALIDATED, ou -> REVISION. Le recomptage (isRecount, RECOUNT_PENDING,
- * IN_ARBITRATION, ARCHIVED) et la re-soumission apres REVISION ne sont pas
- * encore implementes -- dependent du Perimetre en mode recomptage, pas
- * construit.
+ * "normal" : SUBMITTED -> IN_REVIEW -> VALIDATED, ou -> REVISION.
+ *
+ * Chemin recomptage (est_recomptage = true, fiche_initiale_id renseigne) :
+ * l'arbitrage remplace le workflow approve/reject ligne a ligne habituel --
+ * une fois l'arbitrage termine (Perimetre::completeArbitration), la fiche
+ * initiale passe ARCHIVED et la fiche de recomptage devient la fiche de
+ * reference : VALIDATED. Le statut de la fiche n'indique donc pas "qui a
+ * raison" par ligne, seule LigneComptage::resultat_arbitrage le fait.
  */
 class FicheComptage extends Model
 {
@@ -27,6 +30,8 @@ class FicheComptage extends Model
 
     public const STATUT_REVISION = 'REVISION';
 
+    public const STATUT_ARCHIVED = 'ARCHIVED';
+
     protected $table = 'fiches_comptage';
 
     protected $fillable = [
@@ -36,12 +41,15 @@ class FicheComptage extends Model
         'statut',
         'soumise_le',
         'commentaire_revision',
+        'est_recomptage',
+        'fiche_initiale_id',
     ];
 
     protected function casts(): array
     {
         return [
             'soumise_le' => 'datetime',
+            'est_recomptage' => 'boolean',
         ];
     }
 
@@ -75,6 +83,14 @@ class FicheComptage extends Model
     public function lignes(): HasMany
     {
         return $this->hasMany(LigneComptage::class, 'fiche_comptage_id');
+    }
+
+    /**
+     * @return BelongsTo<FicheComptage, $this>
+     */
+    public function ficheInitiale(): BelongsTo
+    {
+        return $this->belongsTo(FicheComptage::class, 'fiche_initiale_id');
     }
 
     /**

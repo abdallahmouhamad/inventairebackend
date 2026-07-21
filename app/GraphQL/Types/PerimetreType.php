@@ -61,6 +61,29 @@ class PerimetreType extends GraphQLType
                 'type' => Type::listOf(GraphQL::type('TentativeAccesPerimetre')),
                 'resolve' => fn (Perimetre $perimetre) => $perimetre->tentativesAcces,
             ],
+            'motif_recomptage' => [
+                'type' => Type::string(),
+            ],
+            'recount_agent' => [
+                'type' => GraphQL::type('Utilisateur'),
+                'resolve' => fn (Perimetre $perimetre) => $perimetre->recountAgent,
+            ],
+            'recount_requested_at' => [
+                'type' => Type::string(),
+                'resolve' => fn (Perimetre $perimetre): ?string => $perimetre->recount_requested_at?->toIso8601String(),
+            ],
+            'recount_submitted_at' => [
+                'type' => Type::string(),
+                'resolve' => fn (Perimetre $perimetre): ?string => $perimetre->recount_submitted_at?->toIso8601String(),
+            ],
+            'arbitrated_at' => [
+                'type' => Type::string(),
+                'resolve' => fn (Perimetre $perimetre): ?string => $perimetre->arbitrated_at?->toIso8601String(),
+            ],
+            'arbitre_par' => [
+                'type' => GraphQL::type('Utilisateur'),
+                'resolve' => fn (Perimetre $perimetre) => $perimetre->arbitrePar,
+            ],
         ];
     }
 }

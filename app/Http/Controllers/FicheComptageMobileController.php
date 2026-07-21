@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FicheComptage;
 use App\Models\LigneComptage;
 use App\Models\Perimetre;
+use App\Services\ArbitrageService;
 use App\Services\AuditService;
 use App\Support\Outils;
 use Exception;
@@ -15,8 +16,7 @@ use OpenApi\Attributes as OA;
 
 /**
  * Soumission de fiche de comptage cote agent mobile (doc fonctionnel
- * §6.4). Routes protegees par le middleware role.mobile. Chemin "normal"
- * uniquement : le recomptage (isRecount) n'est pas encore supporte.
+ * §6.4). Routes protegees par le middleware role.mobile.
  */
 #[OA\Tag(name: 'Fiches de comptage (mobile)', description: 'Soumission d\'une fiche de comptage')]
 class FicheComptageMobileController extends Controller
@@ -245,6 +245,130 @@ class FicheComptageMobileController extends Controller
             AuditService::log(AuditService::FICHE_SOUMISSION, $fiche, ['type' => 'resoumission', 'nb_lignes_corrigees' => count($request->input('lignes'))]);
 
             return response()->json(['data' => $fiche->fresh('lignes')]);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 400);
+        }
+    }
+
+    /**
+     * Soumission du recomptage aveugle (doc fonctionnel, FRONTEND_CONTEXT.md
+     * §3.5). Aucune quantite theorique n'est demandee ici (l'agent de
+     * recomptage n'a acces qu'a la liste des emplacements/articles/lots via
+     * GET .../recount-locations, jamais aux quantites du comptage initial).
+     * Fait passer le perimetre RECOUNTING -> AWAITING_ARBITRATION et declenche
+     * immediatement l'appariement des lignes (App\Services\ArbitrageService).
+     */
+    #[OA\Post(
+        path: '/api/perimeters/{id}/recount-submission',
+        summary: 'Soumet le recomptage (comptage aveugle)',
+        description: 'Reserve a l\'agent assigne au recomptage (recount_agent_id), perimetre au statut RECOUNTING requis.',
+        security: [['bearerAuth' => []]],
+        tags: ['Fiches de comptage (mobile)'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, description: 'ID du perimetre', schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(
+                required: ['lignes'],
+                properties: [
+                    new OA\Property(property: 'lignes', type: 'array', items: new OA\Items(
+                        required: ['code_article', 'code_emplacement', 'numero_lot', 'qte_comptee_itu', 'qte_comptee_stu'],
+                        properties: [
+                            new OA\Property(property: 'code_article', type: 'string', example: 'ART-001'),
+                            new OA\Property(property: 'nom_article', type: 'string', example: 'Paracetamol 500mg'),
+                            new OA\Property(property: 'code_emplacement', type: 'string', example: 'MC01-01A-05'),
+                            new OA\Property(property: 'numero_lot', type: 'string', example: 'NL2012503'),
+                            new OA\Property(property: 'qte_comptee_itu', type: 'integer', example: 8),
+                            new OA\Property(property: 'qte_comptee_stu', type: 'integer', example: 0),
+                        ],
+                    )),
+                ],
+            ),
+        ),
+        responses: [
+            new OA\Response(response: 201, description: 'Recomptage soumis, perimetre passe AWAITING_ARBITRATION.'),
+            new OA\Response(response: 403, description: 'Agent non assigne au recomptage de ce perimetre.'),
+            new OA\Response(response: 400, description: 'Perimetre pas au statut RECOUNTING, ou fiche initiale introuvable.'),
+            new OA\Response(response: 404, description: 'Perimetre introuvable.'),
+            new OA\Response(response: 422, description: 'Champs manquants ou invalides.'),
+        ],
+    )]
+    public function recountSubmission(Request $request, string $id): JsonResponse
+    {
+        $request->validate([
+            'lignes' => 'required|array|min:1',
+            'lignes.*.code_article' => 'required|string',
+            'lignes.*.code_emplacement' => 'required|string',
+            'lignes.*.numero_lot' => 'required|string',
+            'lignes.*.qte_comptee_itu' => 'required|integer|min:0',
+            'lignes.*.qte_comptee_stu' => 'required|integer|min:0',
+        ]);
+
+        $agent = $request->user();
+
+        try {
+            $perimetre = Perimetre::findOrFail($id);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 404);
+        }
+
+        if ($perimetre->recount_agent_id !== $agent->id) {
+            return Outils::reponseErreur(new Exception("Vous n'etes pas l'agent assigne au recomptage de ce perimetre."), 403);
+        }
+
+        if ($perimetre->statut !== Perimetre::STATUT_RECOUNTING) {
+            return Outils::reponseErreur(
+                new Exception("Ce perimetre n'est pas au statut RECOUNTING (statut actuel : {$perimetre->statut})."),
+                400,
+            );
+        }
+
+        $ficheInitiale = $perimetre->ficheInitiale();
+
+        if (!$ficheInitiale) {
+            return Outils::reponseErreur(new Exception('Fiche initiale introuvable pour ce perimetre.'), 400);
+        }
+
+        try {
+            $ficheRecomptage = DB::transaction(function () use ($perimetre, $agent, $request, $ficheInitiale) {
+                $fiche = FicheComptage::create([
+                    'session_id' => $perimetre->session_id,
+                    'perimetre_id' => $perimetre->id,
+                    'agent_id' => $agent->id,
+                    'statut' => FicheComptage::STATUT_SUBMITTED,
+                    'soumise_le' => now(),
+                    'est_recomptage' => true,
+                    'fiche_initiale_id' => $ficheInitiale->id,
+                ]);
+
+                foreach ($request->input('lignes') as $ligne) {
+                    $fiche->lignes()->create([
+                        'code_article' => $ligne['code_article'],
+                        'nom_article' => $ligne['nom_article'] ?? null,
+                        'code_emplacement' => $ligne['code_emplacement'],
+                        'numero_lot' => $ligne['numero_lot'],
+                        'numero_lot_parent' => $ligne['numero_lot_parent'] ?? null,
+                        'date_peremption' => $ligne['date_peremption'] ?? null,
+                        'est_correction_lot' => $ligne['est_correction_lot'] ?? false,
+                        'est_hors_liste' => $ligne['est_hors_liste'] ?? false,
+                        'qte_comptee_itu' => $ligne['qte_comptee_itu'],
+                        'qte_comptee_stu' => $ligne['qte_comptee_stu'],
+                        'statut_review' => LigneComptage::REVIEW_PENDING,
+                    ]);
+                }
+
+                $perimetre->update([
+                    'statut' => Perimetre::STATUT_AWAITING_ARBITRATION,
+                    'recount_submitted_at' => now(),
+                ]);
+
+                return $fiche;
+            });
+
+            ArbitrageService::appairer($ficheInitiale->fresh('lignes'), $ficheRecomptage->fresh('lignes'));
+
+            AuditService::log(AuditService::FICHE_SOUMISSION, $ficheRecomptage, ['type' => 'recomptage', 'nb_lignes' => count($request->input('lignes'))]);
+
+            return response()->json(['data' => $ficheRecomptage->fresh('lignes')], 201);
         } catch (Exception $e) {
             return Outils::reponseErreur($e, 400);
         }

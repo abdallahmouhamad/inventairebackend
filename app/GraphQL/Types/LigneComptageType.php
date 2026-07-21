@@ -5,6 +5,7 @@ namespace App\GraphQL\Types;
 use App\Models\LigneComptage;
 use App\Services\CalculEcart;
 use GraphQL\Type\Definition\Type;
+use Rebing\GraphQL\Support\Facades\GraphQL;
 use Rebing\GraphQL\Support\Type as GraphQLType;
 
 class LigneComptageType extends GraphQLType
@@ -83,6 +84,15 @@ class LigneComptageType extends GraphQLType
                 'type' => Type::string(),
                 'description' => 'normale / avertissement / critique / inconnue',
                 'resolve' => fn (LigneComptage $ligne): string => CalculEcart::pour($ligne)['criticite'],
+            ],
+            'ligne_appariee' => [
+                'type' => GraphQL::type('LigneComptage'),
+                'description' => 'Sur une ligne de recomptage uniquement : la ligne correspondante de la fiche initiale',
+                'resolve' => fn (LigneComptage $ligne) => $ligne->ligneAppariee,
+            ],
+            'resultat_arbitrage' => [
+                'type' => Type::string(),
+                'description' => 'INITIALE / RECOMPTAGE, renseigne une fois l\'arbitrage tranche pour cette paire',
             ],
         ];
     }

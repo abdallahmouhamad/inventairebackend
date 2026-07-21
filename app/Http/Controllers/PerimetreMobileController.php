@@ -24,13 +24,16 @@ use OpenApi\Attributes as OA;
 class PerimetreMobileController extends Controller
 {
     /**
-     * Perimetres declares par l'agent connecte, tous statuts confondus --
+     * Perimetres qui concernent l'agent connecte, tous statuts confondus --
      * permet a l'app de retrouver son perimetre actif sans dependre d'un
-     * cache local (ex: apres reinstallation de l'app).
+     * cache local (ex: apres reinstallation de l'app), et c'est le seul
+     * moyen pour un agent de decouvrir qu'un recomptage lui a ete assigne
+     * (pas de notification push : l'app doit sonder cet endpoint). Le champ
+     * mon_role permet de distinguer les deux cas cote UI.
      */
     #[OA\Get(
         path: '/api/mobile/perimeters',
-        summary: 'Perimetres declares par l\'agent connecte',
+        summary: 'Perimetres qui concernent l\'agent connecte (declares par lui, ou assignes pour recomptage)',
         security: [['bearerAuth' => []]],
         tags: ['Perimetres (mobile)'],
         parameters: [
@@ -43,7 +46,8 @@ class PerimetreMobileController extends Controller
                 description: 'Liste des perimetres de l\'agent, du plus recent au plus ancien.',
                 content: new OA\JsonContent(example: [
                     'data' => [
-                        ['id' => '019f...', 'session_id' => '019f...', 'code_depot' => 'MC01', 'statut' => 'DECLARED', 'declare_le' => '2026-07-15T16:13:08.000000Z', 'codes_rayons' => ['01A', '01B']],
+                        ['id' => '019f...', 'session_id' => '019f...', 'code_depot' => 'MC01', 'statut' => 'DECLARED', 'declare_le' => '2026-07-15T16:13:08.000000Z', 'codes_rayons' => ['01A', '01B'], 'mon_role' => 'declarant'],
+                        ['id' => '019f...', 'session_id' => '019f...', 'code_depot' => 'MC01', 'statut' => 'RECOUNTING', 'declare_le' => '2026-07-14T09:00:00.000000Z', 'codes_rayons' => ['02A'], 'mon_role' => 'agent_recomptage'],
                     ],
                 ]),
             ),
@@ -51,11 +55,13 @@ class PerimetreMobileController extends Controller
     )]
     public function mesPerimetres(Request $request): JsonResponse
     {
-        $perimetres = QueryModel::getQueryPerimetreMobile($request->user(), $request->all())->get();
+        $agent = $request->user();
+        $perimetres = QueryModel::getQueryPerimetreMobile($agent, $request->all())->get();
 
         $donnees = $perimetres->map(fn (Perimetre $perimetre) => [
             ...$perimetre->toArray(),
             'codes_rayons' => $perimetre->codesRayons(),
+            'mon_role' => $perimetre->recount_agent_id === $agent->id ? 'agent_recomptage' : 'declarant',
         ]);
 
         return response()->json(['data' => $donnees]);
@@ -326,6 +332,72 @@ class PerimetreMobileController extends Controller
             AuditService::log(AuditService::PERIMETRE_LIBERATION, $perimetre);
 
             return response()->json(['data' => $perimetre->fresh()]);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 400);
+        }
+    }
+
+    /**
+     * Emplacements/articles/lots a recompter, sans aucune quantite (ni
+     * theorique ni comptee) -- comptage aveugle (doc fonctionnel,
+     * FRONTEND_CONTEXT.md §3.5 : "l'agent de recomptage ne doit jamais voir
+     * les valeurs du comptage initial pendant sa saisie"). Reserve a l'agent
+     * effectivement assigne au recomptage de ce perimetre.
+     */
+    #[OA\Get(
+        path: '/api/perimeters/{id}/recount-locations',
+        summary: 'Liste des emplacements/articles/lots a recompter (sans quantites)',
+        description: 'Reserve a l\'agent assigne au recomptage (recount_agent_id). Comptage aveugle : aucune quantite renvoyee.',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres (mobile)'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Liste sans quantites, a recompter integralement.',
+                content: new OA\JsonContent(example: [
+                    'data' => [
+                        ['ligne_initiale_id' => '019f...', 'code_article' => 'ART-001', 'nom_article' => 'Paracetamol 500mg', 'code_emplacement' => 'MC01-01A-05', 'numero_lot' => 'NL2012503', 'numero_lot_parent' => null, 'date_peremption' => '2027-06-30'],
+                    ],
+                ]),
+            ),
+            new OA\Response(response: 403, description: 'Agent non assigne au recomptage de ce perimetre.'),
+            new OA\Response(response: 400, description: 'Le perimetre n\'est pas au statut RECOUNTING.'),
+            new OA\Response(response: 404, description: 'Perimetre introuvable.'),
+        ],
+    )]
+    public function recountLocations(Request $request, string $id): JsonResponse
+    {
+        try {
+            $perimetre = Perimetre::findOrFail($id);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 404);
+        }
+
+        if ($perimetre->recount_agent_id !== $request->user()->id) {
+            return Outils::reponseErreur(new Exception("Vous n'etes pas l'agent assigne au recomptage de ce perimetre."), 403);
+        }
+
+        try {
+            if ($perimetre->statut !== Perimetre::STATUT_RECOUNTING) {
+                throw new Exception("Ce perimetre n'est pas au statut RECOUNTING (statut actuel : {$perimetre->statut}).");
+            }
+
+            $ficheInitiale = $perimetre->ficheInitiale();
+
+            $lignes = $ficheInitiale
+                ? $ficheInitiale->lignes->map(fn ($ligne) => [
+                    'ligne_initiale_id' => $ligne->id,
+                    'code_article' => $ligne->code_article,
+                    'nom_article' => $ligne->nom_article,
+                    'code_emplacement' => $ligne->code_emplacement,
+                    'numero_lot' => $ligne->numero_lot,
+                    'numero_lot_parent' => $ligne->numero_lot_parent,
+                    'date_peremption' => $ligne->date_peremption,
+                ])
+                : collect();
+
+            return response()->json(['data' => $lignes->values()]);
         } catch (Exception $e) {
             return Outils::reponseErreur($e, 400);
         }

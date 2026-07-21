@@ -55,6 +55,13 @@ Route::middleware(['auth:api', 'role.web'])->group(function () {
     Route::get('sessions/{id}/perimeters', [PerimetreController::class, 'indexParSession']);
     Route::put('perimeters/{id}/force-release', [PerimetreController::class, 'forceRelease']);
     Route::put('perimeters/{perimetreId}/attempts/{tentativeId}/resolve', [PerimetreController::class, 'resoudreTentative']);
+    Route::put('perimeters/{id}/request-recount', [PerimetreController::class, 'requestRecount']);
+    Route::put('perimeters/{id}/cancel-recount', [PerimetreController::class, 'cancelRecount']);
+    Route::put('perimeters/{id}/assign-recount-agent', [PerimetreController::class, 'assignRecountAgent']);
+    Route::get('perimeters/{id}/arbitration', [PerimetreController::class, 'arbitrationOverview']);
+    Route::put('perimeters/{id}/arbitration/lines/{ligneId}', [PerimetreController::class, 'arbitrateLine']);
+    Route::put('perimeters/{id}/arbitration/complete', [PerimetreController::class, 'completeArbitration']);
+    Route::put('perimeters/{id}/relaunch', [PerimetreController::class, 'relaunch']);
 });
 // === Perimetres routes end ===
 
@@ -65,6 +72,8 @@ Route::middleware(['auth:api', 'role.mobile'])->group(function () {
     Route::post('perimeters', [PerimetreMobileController::class, 'declarer']);
     Route::put('perimeters/{id}/release', [PerimetreMobileController::class, 'liberer']);
     Route::post('perimeters/{id}/access-attempt', [PerimetreMobileController::class, 'enregistrerTentativeAcces']);
+    Route::get('perimeters/{id}/recount-locations', [PerimetreMobileController::class, 'recountLocations']);
+    Route::post('perimeters/{id}/recount-submission', [FicheComptageMobileController::class, 'recountSubmission']);
 });
 // === Perimetres mobile routes end ===
 

@@ -15,10 +15,11 @@ use Illuminate\Support\Facades\DB;
  * uniquement leurs codes X3 (cf. RererentielX3, aucune table referentiel
  * dupliquee en Postgres).
  *
- * Perimetre "Option 1" : declaration, disponibilite des rayons, liberation
- * (volontaire ou forcee). Le recomptage/l'arbitrage/la relance (statuts
- * RECOUNT_REQUESTED -> VALIDATED/RELAUNCHED) ne sont pas encore implementes
- * -- prochaine etape une fois les Submissions posees.
+ * Cycle recomptage/arbitrage (doc fonctionnel, FRONTEND_CONTEXT.md §3.5) :
+ * IN_REVIEW -> RECOUNT_REQUESTED -> RECOUNTING -> AWAITING_ARBITRATION ->
+ * VALIDATED (issue normale) ou RELAUNCHED (choix manuel du responsable si
+ * l'arbitrage juge les deux comptages trop peu fiables -- rayons liberes,
+ * comme FORCE_RELEASED, pour permettre une nouvelle declaration).
  */
 class Perimetre extends Model
 {
@@ -69,6 +70,13 @@ class Perimetre extends Model
         'libere_le',
         'libere_par_id',
         'motif_liberation_forcee',
+        'recount_agent_id',
+        'motif_recomptage',
+        'recount_requested_at',
+        'recount_requested_by_id',
+        'recount_submitted_at',
+        'arbitrated_at',
+        'arbitrated_by_id',
     ];
 
     protected function casts(): array
@@ -76,6 +84,9 @@ class Perimetre extends Model
         return [
             'declare_le' => 'datetime',
             'libere_le' => 'datetime',
+            'recount_requested_at' => 'datetime',
+            'recount_submitted_at' => 'datetime',
+            'arbitrated_at' => 'datetime',
         ];
     }
 
@@ -109,6 +120,57 @@ class Perimetre extends Model
     public function tentativesAcces(): HasMany
     {
         return $this->hasMany(TentativeAccesPerimetre::class, 'perimetre_conflit_id');
+    }
+
+    /**
+     * @return HasMany<FicheComptage, $this>
+     */
+    public function fichesComptage(): HasMany
+    {
+        return $this->hasMany(FicheComptage::class, 'perimetre_id');
+    }
+
+    /**
+     * @return BelongsTo<Utilisateur, $this>
+     */
+    public function recountAgent(): BelongsTo
+    {
+        return $this->belongsTo(Utilisateur::class, 'recount_agent_id');
+    }
+
+    /**
+     * @return BelongsTo<Utilisateur, $this>
+     */
+    public function recountRequestedPar(): BelongsTo
+    {
+        return $this->belongsTo(Utilisateur::class, 'recount_requested_by_id');
+    }
+
+    /**
+     * @return BelongsTo<Utilisateur, $this>
+     */
+    public function arbitrePar(): BelongsTo
+    {
+        return $this->belongsTo(Utilisateur::class, 'arbitrated_by_id');
+    }
+
+    /**
+     * Fiche de comptage initiale du cycle en cours (est_recomptage = false).
+     * Un perimetre n'a jamais qu'une seule fiche initiale active a la fois
+     * (la creation d'une nouvelle fiche n'est possible que depuis DECLARED).
+     */
+    public function ficheInitiale(): ?FicheComptage
+    {
+        return $this->fichesComptage()->where('est_recomptage', false)->latest('created_at')->first();
+    }
+
+    /**
+     * Fiche de recomptage du cycle en cours (est_recomptage = true), si le
+     * perimetre est (ou a ete) en cycle de recomptage.
+     */
+    public function ficheRecomptage(): ?FicheComptage
+    {
+        return $this->fichesComptage()->where('est_recomptage', true)->latest('created_at')->first();
     }
 
     /**

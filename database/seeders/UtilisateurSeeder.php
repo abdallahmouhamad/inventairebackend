@@ -24,12 +24,12 @@ class UtilisateurSeeder extends Seeder
 
     public function run(): void
     {
-        $this->creerUtilisateur('Admin', 'PNA', 'admin@inventaire.sn', Role::SUPER_ADMIN);
+        $this->creerUtilisateur('Admin', 'HTSOFT', 'admin@inventaire.sn', Role::SUPER_ADMIN);
 
-        $invMc01 = $this->creerUtilisateur('Responsable', 'Magasin Central', 'inv.mc01@inventaire.sn', Role::INVENTORY_MANAGER);
+        $invMc01 = $this->creerUtilisateur('Responsable', 'Magasin Central', 'inventory.manager1@inventaire.sn', Role::INVENTORY_MANAGER);
         $invMc01->attacherSites(['MC01']);
 
-        $invAg01 = $this->creerUtilisateur('Responsable', 'Agence Toamasina', 'inv.ag01@inventaire.sn', Role::INVENTORY_MANAGER);
+        $invAg01 = $this->creerUtilisateur('Responsable', 'Agence Toamasina', 'inventory.manager2@inventaire.sn', Role::INVENTORY_MANAGER);
         $invAg01->attacherSites(['AG01']);
 
         $this->creerUtilisateur('Audit', 'Lecture Seule', 'audit@inventaire.sn', Role::READONLY);

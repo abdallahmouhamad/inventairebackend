@@ -45,6 +45,37 @@ class PerimetrePolicy
         return $this->forceRelease($acteur, $perimetre);
     }
 
+    /**
+     * perimeter.request_recount / perimeter.arbitrate / perimeter.validate
+     * (FRONTEND_CONTEXT.md §4) : memes habilitations que forceRelease
+     * (SUPER_ADMIN/INVENTORY_MANAGER, memes site), READONLY toujours en
+     * lecture seule sur tout le cycle recomptage/arbitrage.
+     */
+    public function requestRecount(Utilisateur $acteur, Perimetre $perimetre): bool
+    {
+        return $this->forceRelease($acteur, $perimetre);
+    }
+
+    public function cancelRecount(Utilisateur $acteur, Perimetre $perimetre): bool
+    {
+        return $this->forceRelease($acteur, $perimetre);
+    }
+
+    public function assignRecountAgent(Utilisateur $acteur, Perimetre $perimetre): bool
+    {
+        return $this->forceRelease($acteur, $perimetre);
+    }
+
+    public function arbitrate(Utilisateur $acteur, Perimetre $perimetre): bool
+    {
+        return $this->forceRelease($acteur, $perimetre);
+    }
+
+    public function relaunch(Utilisateur $acteur, Perimetre $perimetre): bool
+    {
+        return $this->forceRelease($acteur, $perimetre);
+    }
+
     private function aAccesAuSite(Utilisateur $acteur, Perimetre $perimetre): bool
     {
         $codesSites = $acteur->codesSites();

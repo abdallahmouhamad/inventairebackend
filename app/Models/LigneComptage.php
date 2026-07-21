@@ -12,6 +12,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * App\Services\CalculEcart, pour qu'un changement des seuils configures se
  * repercute immediatement sans script de migration (meme principe que
  * VerrouEmplacement::estObsolete()).
+ *
+ * Arbitrage (App\Services\ArbitrageService) : sur une ligne de la fiche de
+ * RECOMPTAGE uniquement, ligne_appariee_id pointe vers la ligne correspondante
+ * de la fiche initiale (appariee par code_emplacement+code_article+numero_lot),
+ * et resultat_arbitrage porte le choix retenu une fois l'arbitrage tranche.
  */
 class LigneComptage extends Model
 {
@@ -22,6 +27,10 @@ class LigneComptage extends Model
     public const REVIEW_APPROVED = 'APPROVED';
 
     public const REVIEW_REJECTED = 'REJECTED';
+
+    public const RESULTAT_INITIALE = 'INITIALE';
+
+    public const RESULTAT_RECOMPTAGE = 'RECOMPTAGE';
 
     protected $table = 'lignes_comptage';
 
@@ -41,6 +50,8 @@ class LigneComptage extends Model
         'qte_comptee_stu',
         'statut_review',
         'commentaire_rejet',
+        'ligne_appariee_id',
+        'resultat_arbitrage',
     ];
 
     protected function casts(): array
@@ -58,5 +69,13 @@ class LigneComptage extends Model
     public function ficheComptage(): BelongsTo
     {
         return $this->belongsTo(FicheComptage::class, 'fiche_comptage_id');
+    }
+
+    /**
+     * @return BelongsTo<LigneComptage, $this>
+     */
+    public function ligneAppariee(): BelongsTo
+    {
+        return $this->belongsTo(LigneComptage::class, 'ligne_appariee_id');
     }
 }

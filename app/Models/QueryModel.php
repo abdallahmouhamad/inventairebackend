@@ -127,17 +127,24 @@ class QueryModel
     }
 
     /**
-     * Perimetres declares par l'agent mobile connecte -- lui permet de
-     * retrouver son/ses perimetre(s) actif(s) sans dependre d'un cache local
-     * cote app (ex: apres reinstallation). Tous statuts confondus, filtrable
-     * par session.
+     * Perimetres qui concernent l'agent mobile connecte -- soit parce qu'il
+     * les a declares, soit parce qu'il est assigne au recomptage de l'un
+     * d'eux (recount_agent_id). Lui permet de retrouver son/ses perimetre(s)
+     * actif(s) sans dependre d'un cache local cote app (ex: apres
+     * reinstallation), et c'est le seul moyen pour l'agent de recomptage de
+     * decouvrir qu'un recomptage lui a ete assigne (aucune notification
+     * push : l'app doit sonder cet endpoint). Tous statuts confondus,
+     * filtrable par session.
      *
      * @param array<string, mixed> $args
      * @return Builder<Perimetre>
      */
     public static function getQueryPerimetreMobile(Utilisateur $agent, array $args = []): Builder
     {
-        $query = Perimetre::query()->where('agent_declarant_id', $agent->id);
+        $query = Perimetre::query()->where(function (Builder $q) use ($agent) {
+            $q->where('agent_declarant_id', $agent->id)
+                ->orWhere('recount_agent_id', $agent->id);
+        });
 
         if (isset($args['session_id'])) {
             $query->where('session_id', $args['session_id']);

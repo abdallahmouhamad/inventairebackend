@@ -58,6 +58,13 @@ class FicheComptageType extends GraphQLType
                 'type' => Type::listOf(GraphQL::type('LigneComptage')),
                 'resolve' => fn (FicheComptage $fiche) => $fiche->lignes,
             ],
+            'est_recomptage' => [
+                'type' => Type::nonNull(Type::boolean()),
+            ],
+            'fiche_initiale' => [
+                'type' => GraphQL::type('FicheComptage'),
+                'resolve' => fn (FicheComptage $fiche) => $fiche->ficheInitiale,
+            ],
         ];
     }
 }

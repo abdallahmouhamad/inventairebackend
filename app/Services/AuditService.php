@@ -33,6 +33,18 @@ class AuditService
 
     public const PERIMETRE_TENTATIVE_ACCES_REFUSEE = 'perimetre.tentative_acces_refusee';
 
+    public const PERIMETRE_RECOMPTAGE_DEMANDE = 'perimetre.recomptage_demande';
+
+    public const PERIMETRE_RECOMPTAGE_ANNULE = 'perimetre.recomptage_annule';
+
+    public const PERIMETRE_RECOMPTAGE_AGENT_ASSIGNE = 'perimetre.recomptage_agent_assigne';
+
+    public const PERIMETRE_ARBITRAGE_LIGNE = 'perimetre.arbitrage_ligne';
+
+    public const PERIMETRE_ARBITRAGE_COMPLETE = 'perimetre.arbitrage_complete';
+
+    public const PERIMETRE_RELANCE = 'perimetre.relance';
+
     public const LIGNE_APPROBATION = 'ligne_comptage.approbation';
 
     public const LIGNE_REJET = 'ligne_comptage.rejet';
