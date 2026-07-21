@@ -69,6 +69,7 @@ Route::middleware(['auth:api', 'role.web'])->group(function () {
 Route::middleware(['auth:api', 'role.mobile'])->group(function () {
     Route::get('mobile/perimeters', [PerimetreMobileController::class, 'mesPerimetres']);
     Route::get('sessions/{id}/available-aisles', [PerimetreMobileController::class, 'rayonsDisponibles']);
+    Route::get('sessions/{id}/expected-articles', [PerimetreMobileController::class, 'articlesAttendus']);
     Route::post('perimeters', [PerimetreMobileController::class, 'declarer']);
     Route::put('perimeters/{id}/release', [PerimetreMobileController::class, 'liberer']);
     Route::post('perimeters/{id}/access-attempt', [PerimetreMobileController::class, 'enregistrerTentativeAcces']);

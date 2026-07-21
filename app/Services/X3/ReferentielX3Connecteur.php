@@ -32,11 +32,35 @@ class ReferentielX3Connecteur implements X3ConnecteurInterface
         return $this->appeler('/depots', array_filter(['site' => $codeSite]));
     }
 
+    public function recupererDetailRayon(string $codeSite, string $codeDepot, string $codeRayon, int $page = 1, int $perPage = 200): array
+    {
+        $corps = $this->requete("/rayons/{$codeRayon}/detail", [
+            'site' => $codeSite,
+            'depot' => $codeDepot,
+            'page' => $page,
+            'per_page' => $perPage,
+        ]);
+
+        return [
+            'data' => $corps['data'] ?? [],
+            'pagination' => $corps['pagination'] ?? null,
+        ];
+    }
+
     /**
      * @param array<string, mixed> $parametres
      * @return array<int, array<string, mixed>>
      */
     private function appeler(string $chemin, array $parametres = []): array
+    {
+        return $this->requete($chemin, $parametres)['data'] ?? [];
+    }
+
+    /**
+     * @param array<string, mixed> $parametres
+     * @return array<string, mixed>
+     */
+    private function requete(string $chemin, array $parametres = []): array
     {
         try {
             $reponse = Http::baseUrl(config('services.referentielx3.base_url'))
@@ -57,6 +81,6 @@ class ReferentielX3Connecteur implements X3ConnecteurInterface
             throw new RuntimeException("RererentielX3 : {$message} ({$chemin}).");
         }
 
-        return $corps['data'] ?? [];
+        return $corps;
     }
 }

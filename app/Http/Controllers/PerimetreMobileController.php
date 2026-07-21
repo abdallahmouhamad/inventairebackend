@@ -145,6 +145,81 @@ class PerimetreMobileController extends Controller
     }
 
     /**
+     * Articles/lots theoriquement attendus sur un rayon, avant comptage --
+     * enveloppe GET /rayons/:code/detail sur RererentielX3 (FRONTEND_CONTEXT.md
+     * §2.1), jusqu'ici jamais branche cote Laravel : l'agent saisissait tout a
+     * l'aveugle, sans reference theorique (qte_theorique_itu/stu toujours
+     * null en pratique). Pagine cote X3, passthrough page/per_page.
+     */
+    #[OA\Get(
+        path: '/api/sessions/{id}/expected-articles',
+        summary: 'Articles/lots theoriquement attendus sur un rayon (referentiel X3)',
+        description: 'Permet de preremplir code_article/nom_article/qte_theorique avant un comptage, plutot que de tout saisir a l\'aveugle.',
+        security: [['bearerAuth' => []]],
+        tags: ['Perimetres (mobile)'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, description: 'ID de la session', schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'depot', in: 'query', required: true, description: 'Code depot X3', schema: new OA\Schema(type: 'string', example: 'MC01')),
+            new OA\Parameter(name: 'rayon', in: 'query', required: true, description: 'Code rayon X3', schema: new OA\Schema(type: 'string', example: '01A')),
+            new OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
+            new OA\Parameter(name: 'per_page', in: 'query', schema: new OA\Schema(type: 'integer', default: 200)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Liste paginee des lots theoriquement en stock sur ce rayon.',
+                content: new OA\JsonContent(example: [
+                    'data' => [
+                        ['code_site' => 'MC01', 'code_depot' => 'MC01', 'code_emplacement' => 'MC01-01A-05', 'code_rayon' => '01A', 'code_article' => 'ART-001', 'designation_article' => 'Paracetamol 500mg', 'numero_lot' => 'NL2012503', 'date_peremption' => '2027-06-30', 'qte_stu' => 240, 'qte_disponible_stu' => 240, 'unite' => 'COMPRIME'],
+                    ],
+                    'pagination' => ['total' => 42, 'page' => 1, 'per_page' => 200],
+                ]),
+            ),
+            new OA\Response(response: 404, description: 'Session introuvable ou agent non autorise sur cette session.'),
+            new OA\Response(response: 422, description: 'Parametre depot ou rayon manquant.'),
+            new OA\Response(response: 502, description: 'RererentielX3 injoignable ou en erreur.'),
+        ],
+    )]
+    public function articlesAttendus(Request $request, X3ConnecteurInterface $connecteur, string $id): JsonResponse
+    {
+        try {
+            $session = QueryModel::getQuerySessionInventaireMobile($request->user())
+                ->where('id', $id)
+                ->firstOrFail();
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 404);
+        }
+
+        try {
+            $request->validate([
+                'depot' => 'required|string',
+                'rayon' => 'required|string',
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|min:1|max:500',
+            ]);
+        } catch (ValidationException $e) {
+            return Outils::reponseErreur($e, 422);
+        }
+
+        try {
+            $resultat = $connecteur->recupererDetailRayon(
+                $session->code_site,
+                $request->string('depot')->toString(),
+                $request->string('rayon')->toString(),
+                $request->integer('page', 1),
+                $request->integer('per_page', 200),
+            );
+
+            return response()->json([
+                'data' => $resultat['data'],
+                'pagination' => $resultat['pagination'],
+            ]);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 502);
+        }
+    }
+
+    /**
      * Declare un perimetre (depot + rayons). Verification atomique de
      * disponibilite des rayons (doc fonctionnel §6.3/§9.1) via verrou
      * pessimiste sur la session, pour eviter que deux agents declarent le

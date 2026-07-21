@@ -41,4 +41,16 @@ interface X3ConnecteurInterface
      * @return array<int, array<string, mixed>>
      */
     public function recupererDepots(?string $codeSite = null): array;
+
+    /**
+     * Detail des lots en stock d'un rayon -- articles/lots/quantites
+     * theoriques X3 (GET /rayons/:code/detail?site=&depot=&page=&per_page=
+     * sur RererentielX3, FRONTEND_CONTEXT.md §2.1). Utilise cote mobile pour
+     * preremplir la liste des articles attendus avant un comptage (jusqu'ici
+     * jamais branche : l'agent saisissait tout a l'aveugle, sans reference
+     * theorique). Pagine cote X3 -- $pagination contient total/page/per_page.
+     *
+     * @return array{data: array<int, array<string, mixed>>, pagination: array<string, mixed>|null}
+     */
+    public function recupererDetailRayon(string $codeSite, string $codeDepot, string $codeRayon, int $page = 1, int $perPage = 200): array;
 }
