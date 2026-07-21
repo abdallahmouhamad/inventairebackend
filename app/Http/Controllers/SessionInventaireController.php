@@ -2,9 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EntreeAudit;
+use App\Models\FicheComptage;
+use App\Models\Perimetre;
 use App\Models\QueryModel;
 use App\Models\SessionInventaire;
 use App\Models\Utilisateur;
+use App\Models\VerrouEmplacement;
+use App\Services\AuditService;
 use App\Services\X3\ImportateurSessions;
 use App\Services\X3\X3ConnecteurInterface;
 use App\Support\Outils;
@@ -109,6 +114,8 @@ class SessionInventaireController extends Controller
                 'ouverte_par' => auth('api')->id(),
             ]);
 
+            AuditService::log(AuditService::SESSION_OUVERTURE, $session, ['code_site' => $session->code_site]);
+
             return response()->json(['data' => $session->fresh('ouvertePar')]);
         } catch (AuthorizationException $e) {
             return Outils::reponseErreur($e, 403);
@@ -156,6 +163,12 @@ class SessionInventaireController extends Controller
                     ->all();
 
             $resultat = $importateur->importer($sessionsX3);
+
+            AuditService::log(AuditService::SESSION_SYNCHRONISATION_X3, null, [
+                'total_x3' => count($sessionsX3),
+                'creees' => $resultat['creees'],
+                'deja_presentes' => $resultat['deja_presentes'],
+            ]);
 
             return response()->json([
                 'data' => [
@@ -259,19 +272,24 @@ class SessionInventaireController extends Controller
     }
 
     /**
-     * Historique d'audit de la session. Retourne une liste vide pour
-     * l'instant : le systeme d'audit transverse (§3.8 FRONTEND_CONTEXT.md,
-     * "toute mutation doit ecrire une entree d'audit") n'est pas encore
-     * construit -- prochaine etape logique, a ne pas laisser trainer.
+     * Historique d'audit de la session : toutes les entrees dont la cible est
+     * la session elle-meme OU l'un de ses perimetres/fiches/verrous
+     * (FRONTEND_CONTEXT.md §3.8, "toute mutation doit ecrire une entree
+     * d'audit"). Desormais branche sur le vrai journal (App\Models\EntreeAudit)
+     * -- voir aussi GET /api/audit pour une vue transverse non filtree par session.
      */
     #[OA\Get(
         path: '/api/sessions/{id}/history',
-        summary: 'Historique d\'audit de la session (pas encore implemente)',
-        description: 'Renvoie actuellement toujours data: [] avec une note explicative.',
+        summary: 'Historique d\'audit de la session',
+        description: 'Entrees dont la cible est la session ou l\'un de ses perimetres/fiches/verrous, triees du plus recent au plus ancien.',
         security: [['bearerAuth' => []]],
         tags: ['Sessions'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
-        responses: [new OA\Response(response: 200, description: 'Stub, liste vide.', content: new OA\JsonContent(example: ['data' => [], 'note' => "Journal d'audit pas encore implemente cote backend."]))],
+        responses: [
+            new OA\Response(response: 200, description: 'Liste des entrees d\'audit.'),
+            new OA\Response(response: 403, description: 'Site hors du perimetre de l\'acteur.'),
+            new OA\Response(response: 404, description: 'Session introuvable.'),
+        ],
     )]
     public function history(string $id): JsonResponse
     {
@@ -280,10 +298,21 @@ class SessionInventaireController extends Controller
 
             $this->authorize('view', $session);
 
-            return response()->json([
-                'data' => [],
-                'note' => "Journal d'audit pas encore implemente cote backend.",
-            ]);
+            $idsPerimetres = Perimetre::where('session_id', $session->id)->pluck('id');
+            $idsFiches = FicheComptage::where('session_id', $session->id)->pluck('id');
+            $idsVerrous = VerrouEmplacement::where('session_id', $session->id)->pluck('id');
+
+            $entrees = EntreeAudit::with('acteur')
+                ->where(function ($q) use ($session, $idsPerimetres, $idsFiches, $idsVerrous) {
+                    $q->where(fn ($q2) => $q2->where('cible_type', (new SessionInventaire())->getMorphClass())->where('cible_id', $session->id))
+                        ->orWhere(fn ($q2) => $q2->where('cible_type', (new Perimetre())->getMorphClass())->whereIn('cible_id', $idsPerimetres))
+                        ->orWhere(fn ($q2) => $q2->where('cible_type', (new FicheComptage())->getMorphClass())->whereIn('cible_id', $idsFiches))
+                        ->orWhere(fn ($q2) => $q2->where('cible_type', (new VerrouEmplacement())->getMorphClass())->whereIn('cible_id', $idsVerrous));
+                })
+                ->orderByDesc('created_at')
+                ->get();
+
+            return response()->json(['data' => $entrees]);
         } catch (AuthorizationException $e) {
             return Outils::reponseErreur($e, 403);
         } catch (Exception $e) {

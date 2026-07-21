@@ -7,6 +7,7 @@ use App\Models\LigneComptage;
 use App\Models\Perimetre;
 use App\Models\QueryModel;
 use App\Models\SessionInventaire;
+use App\Services\AuditService;
 use App\Services\CalculEcart;
 use App\Support\Outils;
 use Exception;
@@ -230,6 +231,13 @@ class FicheComptageController extends Controller
                 'commentaire_rejet' => $motif,
             ]);
 
+            $actionAudit = match ($statut) {
+                LigneComptage::REVIEW_APPROVED => AuditService::LIGNE_APPROBATION,
+                LigneComptage::REVIEW_REJECTED => AuditService::LIGNE_REJET,
+                default => AuditService::LIGNE_REINITIALISATION,
+            };
+            AuditService::log($actionAudit, $ligne, array_filter(['motif' => $motif]));
+
             return response()->json(['data' => [
                 ...$ligne->fresh()->toArray(),
                 'ecart' => CalculEcart::pour($ligne->fresh()),
@@ -271,6 +279,8 @@ class FicheComptageController extends Controller
 
             $fiche->update(['statut' => FicheComptage::STATUT_VALIDATED]);
             $fiche->perimetre->update(['statut' => Perimetre::STATUT_VALIDATED]);
+
+            AuditService::log(AuditService::FICHE_VALIDATION, $fiche);
 
             return response()->json(['data' => $fiche->fresh()]);
         } catch (AuthorizationException $e) {
@@ -317,6 +327,8 @@ class FicheComptageController extends Controller
                 'statut' => FicheComptage::STATUT_REVISION,
                 'commentaire_revision' => $request->input('commentaire'),
             ]);
+
+            AuditService::log(AuditService::FICHE_RENVOI_REVISION, $fiche, array_filter(['commentaire' => $request->input('commentaire')]));
 
             return response()->json(['data' => $fiche->fresh()]);
         } catch (AuthorizationException $e) {

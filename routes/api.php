@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\EntreeAuditController;
 use App\Http\Controllers\FicheComptageController;
 use App\Http\Controllers\FicheComptageMobileController;
 use App\Http\Controllers\PerimetreController;
@@ -110,3 +111,10 @@ Route::middleware(['auth:api', 'role.mobile'])->group(function () {
     Route::put('submissions/{id}/resoumettre', [FicheComptageMobileController::class, 'resoumettre']);
 });
 // === Fiches de comptage mobile routes end ===
+
+// === Audit routes start ===
+Route::middleware(['auth:api', 'role.web'])->group(function () {
+    Route::get('audit/export', [EntreeAuditController::class, 'export']);
+    Route::get('audit', [EntreeAuditController::class, 'index']);
+});
+// === Audit routes end ===

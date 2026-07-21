@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FicheComptage;
 use App\Models\LigneComptage;
 use App\Models\Perimetre;
+use App\Services\AuditService;
 use App\Support\Outils;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -129,6 +130,8 @@ class FicheComptageMobileController extends Controller
                 return $fiche;
             });
 
+            AuditService::log(AuditService::FICHE_SOUMISSION, $fiche, ['type' => 'initiale', 'nb_lignes' => count($request->input('lignes'))]);
+
             return response()->json(['data' => $fiche->fresh('lignes')], 201);
         } catch (Exception $e) {
             return Outils::reponseErreur($e, 400);
@@ -238,6 +241,8 @@ class FicheComptageMobileController extends Controller
 
                 $fiche->perimetre->update(['statut' => Perimetre::STATUT_AWAITING_REVIEW]);
             });
+
+            AuditService::log(AuditService::FICHE_SOUMISSION, $fiche, ['type' => 'resoumission', 'nb_lignes_corrigees' => count($request->input('lignes'))]);
 
             return response()->json(['data' => $fiche->fresh('lignes')]);
         } catch (Exception $e) {

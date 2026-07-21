@@ -6,6 +6,7 @@ use App\Models\Perimetre;
 use App\Models\QueryModel;
 use App\Models\SessionInventaire;
 use App\Models\TentativeAccesPerimetre;
+use App\Services\AuditService;
 use App\Support\Outils;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -168,6 +169,8 @@ class PerimetreController extends Controller
                 'libere_par_id' => $request->user()->id,
                 'motif_liberation_forcee' => $request->string('motif'),
             ]);
+
+            AuditService::log(AuditService::PERIMETRE_LIBERATION_FORCEE, $perimetre, ['motif' => $request->string('motif')->toString()]);
 
             return response()->json(['data' => $perimetre->fresh('liberePar')]);
         } catch (AuthorizationException $e) {

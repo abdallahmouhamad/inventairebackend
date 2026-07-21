@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Utilisateur;
+use App\Services\AuditService;
 use App\Support\Outils;
 use Exception;
 use Illuminate\Http\JsonResponse;
@@ -95,6 +96,10 @@ class AuthController extends Controller
 
             $utilisateur->update(['derniere_connexion_le' => now()]);
 
+            // A cet instant Auth::guard('api')->user() n'est pas encore lie a la
+            // requete (login precede l'authentification) -- acteur passe explicitement.
+            AuditService::log(AuditService::CONNEXION, $utilisateur, ['plateforme' => $request->plateforme], $utilisateur);
+
             return response()->json([
                 'data' => [
                     'token' => $token,
@@ -156,6 +161,8 @@ class AuthController extends Controller
     public function logout(): JsonResponse
     {
         try {
+            AuditService::log(AuditService::DECONNEXION);
+
             JWTAuth::parseToken()->invalidate();
 
             return response()->json(['data' => true]);

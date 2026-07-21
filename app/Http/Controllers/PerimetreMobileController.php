@@ -6,6 +6,7 @@ use App\Models\Perimetre;
 use App\Models\QueryModel;
 use App\Models\SessionInventaire;
 use App\Models\TentativeAccesPerimetre;
+use App\Services\AuditService;
 use App\Services\X3\X3ConnecteurInterface;
 use App\Support\Outils;
 use Exception;
@@ -251,7 +252,7 @@ class PerimetreMobileController extends Controller
 
             if ($perimetre === null) {
                 foreach ($conflitsParRayon as $codeRayonConflit => $perimetreConflitId) {
-                    TentativeAccesPerimetre::create([
+                    $tentative = TentativeAccesPerimetre::create([
                         'session_id' => $session->id,
                         'code_depot' => $codeDepot,
                         'code_rayon' => $codeRayonConflit,
@@ -259,12 +260,23 @@ class PerimetreMobileController extends Controller
                         'perimetre_conflit_id' => $perimetreConflitId,
                         'tentee_le' => now(),
                     ]);
+
+                    AuditService::log(AuditService::PERIMETRE_TENTATIVE_ACCES_REFUSEE, $tentative, [
+                        'code_depot' => $codeDepot,
+                        'code_rayon' => $codeRayonConflit,
+                        'perimetre_conflit_id' => $perimetreConflitId,
+                    ]);
                 }
 
                 $listeConflits = implode(', ', array_keys($conflitsParRayon));
 
                 return Outils::reponseErreur(new Exception("Rayon(s) deja occupe(s) par un autre agent : {$listeConflits}."), 409);
             }
+
+            AuditService::log(AuditService::PERIMETRE_DECLARATION, $perimetre, [
+                'code_depot' => $codeDepot,
+                'codes_rayons' => $codesDemandes,
+            ]);
 
             return response()->json([
                 'data' => [
@@ -310,6 +322,8 @@ class PerimetreMobileController extends Controller
                 'statut' => Perimetre::STATUT_RELEASED_BY_AGENT,
                 'libere_le' => now(),
             ]);
+
+            AuditService::log(AuditService::PERIMETRE_LIBERATION, $perimetre);
 
             return response()->json(['data' => $perimetre->fresh()]);
         } catch (Exception $e) {

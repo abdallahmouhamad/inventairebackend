@@ -205,6 +205,46 @@ class QueryModel
     }
 
     /**
+     * Journal d'audit filtre et pagine (doc fonctionnel §6.8 : "acteur,
+     * action, date, recherche"). Pas de scoping par site -- audit.view est
+     * accorde de facon identique aux trois roles web (§8.2), et le document
+     * ne liste pas l'audit parmi les entites a restreindre par site (§8.3).
+     *
+     * @param array<string, mixed> $args
+     * @return Builder<EntreeAudit>
+     */
+    public static function getQueryEntreeAudit(array $args): Builder
+    {
+        $query = EntreeAudit::query()->with('acteur');
+
+        if (isset($args['acteur_id'])) {
+            $query->where('acteur_id', $args['acteur_id']);
+        }
+
+        if (isset($args['action'])) {
+            $query->where('action', $args['action']);
+        }
+
+        if (isset($args['date_debut'])) {
+            $query->whereDate('created_at', '>=', $args['date_debut']);
+        }
+
+        if (isset($args['date_fin'])) {
+            $query->whereDate('created_at', '<=', $args['date_fin']);
+        }
+
+        if (!empty($args['recherche'])) {
+            $terme = $args['recherche'];
+            $query->where(function (Builder $q) use ($terme) {
+                $q->where('action', 'ilike', "%{$terme}%")
+                    ->orWhere('cible_type', 'ilike', "%{$terme}%");
+            });
+        }
+
+        return $query->orderByDesc('created_at');
+    }
+
+    /**
      * Meme principe que scoperSites, mais pour les entites qui n'ont pas de
      * colonne code_site propre (Perimetre, VerrouEmplacement, FicheComptage) :
      * filtre via la session parente.

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\QueryModel;
 use App\Models\SessionInventaire;
 use App\Models\VerrouEmplacement;
+use App\Services\AuditService;
 use App\Support\Outils;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -107,6 +108,8 @@ class VerrouEmplacementController extends Controller
                 'force_libere' => true,
                 'motif_liberation_forcee' => $request->string('motif'),
             ]);
+
+            AuditService::log(AuditService::VERROU_LIBERATION_FORCEE, $verrou, ['motif' => $request->string('motif')->toString()]);
 
             return response()->json(['data' => $verrou->fresh('liberePar')]);
         } catch (AuthorizationException $e) {
