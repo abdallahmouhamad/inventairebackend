@@ -36,6 +36,7 @@ Route::middleware(['auth:api', 'role.web'])->group(function () {
     Route::get('sessions/{id}', [SessionInventaireController::class, 'show']);
     Route::put('sessions/{id}/open', [SessionInventaireController::class, 'open']);
     Route::get('sessions/{id}/history', [SessionInventaireController::class, 'history']);
+    Route::get('sessions/{id}/stock', [SessionInventaireController::class, 'stockRayon']);
     Route::post('sessions/{id}/agents', [SessionInventaireController::class, 'ajouterAgent']);
     Route::delete('sessions/{id}/agents/{utilisateurId}', [SessionInventaireController::class, 'retirerAgent']);
 });

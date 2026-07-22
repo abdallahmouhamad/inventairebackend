@@ -272,6 +272,85 @@ class SessionInventaireController extends Controller
     }
 
     /**
+     * Equivalent Web Admin de PerimetreMobileController::articlesAttendus() --
+     * meme donnee (GET /rayons/:code/detail sur RererentielX3), mais scopee
+     * par site (SessionInventairePolicy::view) plutot que par agent mobile
+     * autorise. Chemin distinct de la route mobile : Laravel ne peut pas
+     * dispatcher une meme URL vers deux controleurs selon le role, donc pas
+     * de collision possible avec GET /api/sessions/{id}/expected-articles.
+     */
+    #[OA\Get(
+        path: '/api/sessions/{id}/stock',
+        summary: 'Stock theorique X3 d\'un rayon (articles/lots/quantites, lecture seule)',
+        description: 'Equivalent web de GET /api/sessions/{id}/expected-articles (mobile) -- utile pour verifier le theorique X3 lors de l\'examen d\'une fiche.',
+        security: [['bearerAuth' => []]],
+        tags: ['Sessions'],
+        parameters: [
+            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'depot', in: 'query', required: true, description: 'Code depot X3', schema: new OA\Schema(type: 'string', example: 'MC01')),
+            new OA\Parameter(name: 'rayon', in: 'query', required: true, description: 'Code rayon X3', schema: new OA\Schema(type: 'string', example: '01A')),
+            new OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
+            new OA\Parameter(name: 'per_page', in: 'query', schema: new OA\Schema(type: 'integer', default: 200)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Liste paginee des lots theoriquement en stock sur ce rayon.',
+                content: new OA\JsonContent(example: [
+                    'data' => [
+                        ['code_site' => 'MC01', 'code_depot' => 'MC01', 'code_emplacement' => 'MC01-01A-05', 'code_rayon' => '01A', 'code_article' => 'ART-001', 'designation_article' => 'Paracetamol 500mg', 'numero_lot' => 'NL2012503', 'date_peremption' => '2027-06-30', 'qte_stu' => 240, 'qte_disponible_stu' => 240, 'unite' => 'COMPRIME'],
+                    ],
+                    'pagination' => ['total' => 42, 'page' => 1, 'per_page' => 200],
+                ]),
+            ),
+            new OA\Response(response: 403, description: 'Site hors du perimetre de l\'acteur.'),
+            new OA\Response(response: 404, description: 'Session introuvable.'),
+            new OA\Response(response: 422, description: 'Parametre depot ou rayon manquant.'),
+            new OA\Response(response: 502, description: 'RererentielX3 injoignable ou en erreur.'),
+        ],
+    )]
+    public function stockRayon(Request $request, X3ConnecteurInterface $connecteur, string $id): JsonResponse
+    {
+        try {
+            $session = SessionInventaire::findOrFail($id);
+
+            $this->authorize('view', $session);
+        } catch (AuthorizationException $e) {
+            return Outils::reponseErreur($e, 403);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 404);
+        }
+
+        try {
+            $request->validate([
+                'depot' => 'required|string',
+                'rayon' => 'required|string',
+                'page' => 'integer|min:1',
+                'per_page' => 'integer|min:1|max:500',
+            ]);
+        } catch (ValidationException $e) {
+            return Outils::reponseErreur($e, 422);
+        }
+
+        try {
+            $resultat = $connecteur->recupererDetailRayon(
+                $session->code_site,
+                $request->string('depot')->toString(),
+                $request->string('rayon')->toString(),
+                $request->integer('page', 1),
+                $request->integer('per_page', 200),
+            );
+
+            return response()->json([
+                'data' => $resultat['data'],
+                'pagination' => $resultat['pagination'],
+            ]);
+        } catch (Exception $e) {
+            return Outils::reponseErreur($e, 502);
+        }
+    }
+
+    /**
      * Historique d'audit de la session : toutes les entrees dont la cible est
      * la session elle-meme OU l'un de ses perimetres/fiches/verrous
      * (FRONTEND_CONTEXT.md §3.8, "toute mutation doit ecrire une entree
