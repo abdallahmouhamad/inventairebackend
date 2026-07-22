@@ -51,7 +51,7 @@ class SessionInventaireController extends Controller
         $sessions = QueryModel::getQuerySessionInventaire($request->all())
             ->paginate($request->integer('count', 15), ['*'], 'page', $request->integer('page', 1));
 
-        return response()->json(['data' => $sessions]);
+        return response()->json(['data' => Outils::avecHasMore($sessions)]);
     }
 
     #[OA\Get(

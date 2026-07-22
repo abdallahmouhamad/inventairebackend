@@ -4,6 +4,7 @@ namespace App\Support;
 
 use GraphQL\Type\Definition\Type;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -68,6 +69,23 @@ class Outils
         }
 
         return response()->json($payload, $statut);
+    }
+
+    /**
+     * Ajoute has_more (booleen) a la representation d'un LengthAwarePaginator
+     * -- demande explicite du dev mobile pour toutes les listes paginees de
+     * l'API, calcule a partir de current_page/last_page plutot que fourni par
+     * Laravel nativement (qui n'expose que has_more_pages() cote objet, pas
+     * dans le JSON serialise).
+     *
+     * @return array<string, mixed>
+     */
+    public static function avecHasMore(LengthAwarePaginator $paginator): array
+    {
+        return [
+            ...$paginator->toArray(),
+            'has_more' => $paginator->currentPage() < $paginator->lastPage(),
+        ];
     }
 
     /**

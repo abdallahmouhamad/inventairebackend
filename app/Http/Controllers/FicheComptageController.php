@@ -46,7 +46,7 @@ class FicheComptageController extends Controller
         $fiches = QueryModel::getQueryFicheComptage($request->all())
             ->paginate($request->integer('count', 15), ['*'], 'page', $request->integer('page', 1));
 
-        return response()->json(['data' => $fiches]);
+        return response()->json(['data' => Outils::avecHasMore($fiches)]);
     }
 
     #[OA\Get(

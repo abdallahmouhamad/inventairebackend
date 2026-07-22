@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\EntreeAudit;
 use App\Models\QueryModel;
+use App\Support\Outils;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,7 @@ class EntreeAuditController extends Controller
         $entrees = QueryModel::getQueryEntreeAudit($request->all())
             ->paginate($request->integer('count', 15), ['*'], 'page', $request->integer('page', 1));
 
-        return response()->json(['data' => $entrees]);
+        return response()->json(['data' => Outils::avecHasMore($entrees)]);
     }
 
     #[OA\Get(

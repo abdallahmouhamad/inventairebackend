@@ -48,7 +48,7 @@ class PerimetreController extends Controller
         $perimetres = QueryModel::getQueryPerimetre($request->all())
             ->paginate($request->integer('count', 15), ['*'], 'page', $request->integer('page', 1));
 
-        return response()->json(['data' => $perimetres]);
+        return response()->json(['data' => Outils::avecHasMore($perimetres)]);
     }
 
     #[OA\Get(

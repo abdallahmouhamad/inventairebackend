@@ -41,9 +41,15 @@ class ReferentielX3Connecteur implements X3ConnecteurInterface
             'per_page' => $perPage,
         ]);
 
+        $pagination = $corps['pagination'] ?? null;
+
+        if (is_array($pagination) && isset($pagination['page'], $pagination['last_page'])) {
+            $pagination['has_more'] = (bool) ($pagination['page'] < $pagination['last_page']);
+        }
+
         return [
             'data' => $corps['data'] ?? [],
-            'pagination' => $corps['pagination'] ?? null,
+            'pagination' => $pagination,
         ];
     }
 
