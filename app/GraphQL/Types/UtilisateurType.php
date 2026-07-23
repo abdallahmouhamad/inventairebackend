@@ -48,6 +48,11 @@ class UtilisateurType extends GraphQLType
                 'type' => GraphQL::type('Role'),
                 'resolve' => fn (Utilisateur $utilisateur) => $utilisateur->role,
             ],
+            'codes_sites' => [
+                'type' => Type::listOf(Type::string()),
+                'description' => "Sites auxquels l'utilisateur est rattache (vide = tous les sites, cas INVENTORY_MANAGER uniquement)",
+                'resolve' => fn (Utilisateur $utilisateur): array => $utilisateur->codesSites(),
+            ],
         ];
     }
 }

@@ -22,6 +22,7 @@ Route::get('auth/me', [AuthController::class, 'me'])->middleware('auth:api');
 
 // === Utilisateurs routes start ===
 Route::middleware(['auth:api', 'role.web'])->group(function () {
+    Route::get('utilisateurs', [UtilisateurController::class, 'index']);
     Route::post('utilisateurs', [UtilisateurController::class, 'store']);
     Route::put('utilisateurs/{id}', [UtilisateurController::class, 'update']);
     Route::delete('utilisateurs/{id}', [UtilisateurController::class, 'desactiver']);

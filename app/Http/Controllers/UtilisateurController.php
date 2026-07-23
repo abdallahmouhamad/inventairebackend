@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\QueryModel;
 use App\Models\Role;
 use App\Models\Utilisateur;
 use App\Support\Outils;
@@ -25,6 +26,55 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'Utilisateurs', description: 'Gestion des comptes -- reserve SUPER_ADMIN')]
 class UtilisateurController extends Controller
 {
+    /**
+     * Liste des comptes, paginee et filtrable -- jusqu'ici absente (seuls
+     * create/update/desactiver/reactiver existaient), bloquant tout ecran web
+     * de gestion des comptes qui a besoin d'afficher les utilisateurs
+     * existants et leur(s) site(s) lie(s) (codes_sites) avant de les modifier.
+     */
+    #[OA\Get(
+        path: '/api/utilisateurs',
+        summary: 'Liste des comptes, paginee et filtrable (SUPER_ADMIN uniquement)',
+        security: [['bearerAuth' => []]],
+        tags: ['Utilisateurs'],
+        parameters: [
+            new OA\Parameter(name: 'recherche', in: 'query', description: 'Recherche sur prenom, nom ou email', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'role_code', in: 'query', schema: new OA\Schema(type: 'string', example: 'INVENTORY_MANAGER')),
+            new OA\Parameter(name: 'est_actif', in: 'query', schema: new OA\Schema(type: 'boolean')),
+            new OA\Parameter(name: 'page', in: 'query', schema: new OA\Schema(type: 'integer', default: 1)),
+            new OA\Parameter(name: 'count', in: 'query', schema: new OA\Schema(type: 'integer', default: 15)),
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Liste paginee, chaque compte inclut codes_sites.',
+                content: new OA\JsonContent(example: [
+                    'data' => [
+                        'data' => [
+                            ['id' => '019f...', 'prenom' => 'Responsable', 'nom' => 'Magasin Central', 'email' => 'inventory.manager1@inventaire.sn', 'est_actif' => true, 'role' => ['code' => 'INVENTORY_MANAGER', 'libelle' => 'Responsable inventaire'], 'codes_sites' => ['MC01']],
+                        ],
+                        'current_page' => 1, 'last_page' => 1, 'total' => 1, 'has_more' => false,
+                    ],
+                ]),
+            ),
+            new OA\Response(response: 403, description: 'Acteur non SUPER_ADMIN.'),
+        ],
+    )]
+    public function index(Request $request): JsonResponse
+    {
+        $this->authorize('viewAny', Utilisateur::class);
+
+        $utilisateurs = QueryModel::getQueryUtilisateur($request->all())
+            ->paginate($request->integer('count', 15), ['*'], 'page', $request->integer('page', 1));
+
+        $utilisateurs = $utilisateurs->through(fn (Utilisateur $utilisateur) => [
+            ...$utilisateur->toArray(),
+            'codes_sites' => $utilisateur->codesSites(),
+        ]);
+
+        return response()->json(['data' => Outils::avecHasMore($utilisateurs)]);
+    }
+
     #[OA\Post(
         path: '/api/utilisateurs',
         summary: 'Creer un compte (SUPER_ADMIN uniquement)',

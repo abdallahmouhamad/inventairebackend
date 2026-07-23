@@ -13,6 +13,18 @@ use App\Models\Utilisateur;
  */
 class UtilisateurPolicy
 {
+    /**
+     * Consultation ouverte a tout compte web (SUPER_ADMIN/INVENTORY_MANAGER/
+     * READONLY), coherente avec les queries GraphQL equivalentes
+     * (utilisateurs/utilisateurPaginated) qui ne sont pas non plus
+     * restreintes a SUPER_ADMIN -- create/update/delete restent, eux,
+     * reserves a SUPER_ADMIN (gestion des comptes, pas simple consultation).
+     */
+    public function viewAny(Utilisateur $acteur): bool
+    {
+        return $acteur->isWebRole();
+    }
+
     public function create(Utilisateur $acteur): bool
     {
         return $acteur->role->code === Role::SUPER_ADMIN;
