@@ -85,6 +85,8 @@ Route::middleware(['auth:api', 'role.mobile'])->group(function () {
 Route::middleware(['auth:api'])->group(function () {
     Route::get('reference/sites', [ReferentielController::class, 'sites']);
     Route::get('reference/depots', [ReferentielController::class, 'depots']);
+    Route::get('reference/rayons', [ReferentielController::class, 'rayons']);
+    Route::get('reference/rayons/{code}/stock', [ReferentielController::class, 'rayonStock']);
 });
 // === Referentiel routes end ===
 

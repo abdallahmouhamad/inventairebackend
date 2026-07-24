@@ -41,7 +41,7 @@ return [
      * de tables X3 dupliquees en Postgres, on interroge en direct via HTTP.
      */
     'referentielx3' => [
-        'base_url' => env('REFERENTIELX3_BASE_URL', 'http://102.16.235.175:9090/referentielx3'),
+        'base_url' => env('REFERENTIELX3_BASE_URL', 'http://196.207.230.171:9191/referentielx3'),
         'timeout' => env('REFERENTIELX3_TIMEOUT', 15),
     ],
 

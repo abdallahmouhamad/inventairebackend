@@ -2,6 +2,7 @@
 
 namespace App\Services\X3;
 
+use App\Support\Outils;
 use Illuminate\Support\Facades\Http;
 use RuntimeException;
 
@@ -47,8 +48,16 @@ class ReferentielX3Connecteur implements X3ConnecteurInterface
             $pagination['has_more'] = (bool) ($pagination['page'] < $pagination['last_page']);
         }
 
+        $lignes = array_map(function (array $ligne) {
+            if (array_key_exists('date_peremption', $ligne)) {
+                $ligne['date_peremption'] = Outils::nettoyerDateX3($ligne['date_peremption']);
+            }
+
+            return $ligne;
+        }, $corps['data'] ?? []);
+
         return [
-            'data' => $corps['data'] ?? [],
+            'data' => $lignes,
             'pagination' => $pagination,
         ];
     }
